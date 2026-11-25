@@ -71,3 +71,12 @@ def test_stale_when_the_config_changes_after_the_prose_was_written(repo):
     rules.write(repo.root, config(repo))
     assert rules.stale(repo.root, config(repo)) == []
     assert [p.name for p in rules.stale(repo.root, config(repo, "[complexity]\nccn_fail = 9\n"))] == ["AGENTS.md"]
+
+
+def test_prose_invites_the_agent_to_challenge_the_rules_and_keeps_the_decision_with_the_human(repo):
+    block = rules.render(config(repo))
+    assert "### Improving these rules" in block
+    assert "you are expected to challenge them" in block
+    assert "Run `gate gaps`" in block
+    assert "even when nobody asked" in block
+    assert "Propose; do not apply." in block

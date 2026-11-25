@@ -26,6 +26,11 @@ and defaults; each repo declares its own limits, boundaries and commands in
   it warns.
 - **A check that cannot run says so.** Missing tools are reported as skipped,
   never as a pass. `--strict` turns a skip into a failure for CI.
+- **The rules invite criticism.** Whoever works under the rules, person or
+  agent, is told plainly to look for where they fall short and to propose
+  better ones. A gate nobody questions stops matching the code it guards.
+- **Agents propose; a person decides.** No command an agent is expected to
+  run changes what the rules are.
 
 ## Commands
 
@@ -35,6 +40,7 @@ and defaults; each repo declares its own limits, boundaries and commands in
 | `gate check [paths]` | Run the checks, print findings, exit 0 or 1 |
 | `gate baseline` | Report, accept (`--accept`) or shrink (`--prune`) recorded violations; `--check` fails if it is stale |
 | `gate todo` | List the baseline as a work queue, worst file first |
+| `gate gaps` | List weaknesses in the repo's rules that gate can see for itself; always exits 0 |
 | `gate rules` | Write the rules as prose into `AGENTS.md` / `CLAUDE.md`; `--check` fails if they lag `gate.toml` |
 
 `gate check` flags: `--changed [--base REF]` for the git diff plus untracked
@@ -108,6 +114,32 @@ everything outside the markers belongs to the file's author and is never
 touched. Because the prose is generated from the same file the checks read,
 an agent is never told one limit and held to another.
 
+## Finding weaknesses
+
+Three surfaces carry the same invitation, so it reaches an agent whichever
+way it meets the repo.
+
+`gate gaps` is the factual part. It reports:
+
+- **unchecked**: a toolchain category with no tool or command; a check, test
+  or command that no profile runs; no tests configured at all
+- **boundaries**: import directions the code already respects that no rule
+  protects (the same proposals `gate init` makes, minus those already covered)
+- **headroom**: for each limit, the tightest value that would fail nothing
+  that passes today
+- **blind spots**: files matched by `[files] exclude`, and size overrides
+- **upkeep**: a stale baseline, a non-empty baseline, stale rules prose
+- **ci**: workflows exist but none runs `gate check`
+
+It ends by naming what it cannot see, so an empty report is not read as a
+clean bill of health.
+
+The generated rules prose ends with an "Improving these rules" section, and
+the Stop hook's failure message tells the agent to report a wrong finding
+rather than work around it. The `gate-review` skill covers what needs a
+reader: bugs that got through, tests that prove nothing, and whether a limit
+is producing better code or just smaller pieces.
+
 ## Extending
 
 A check is a module in `src/gate/checks/` exposing `run(ctx) -> list[Finding]`
@@ -129,10 +161,11 @@ src/gate/
   propose.py        boundary rules from existing imports
   todo.py           the baseline as a work queue
   rules.py          the config as prose for agent instruction files
+  gaps.py           weaknesses in the rules that gate can see itself
   checks/           one module per check
   lang/             import graph and JS/TS module resolution
 adapters/
-  claude-code/      plugin: Stop hook and cleanup skill
+  claude-code/      plugin: Stop hook, cleanup skill and review skill
   github-actions/   workflow template
 ```
 

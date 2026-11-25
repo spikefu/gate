@@ -1,0 +1,181 @@
+"""Lists the weaknesses in a repo's rules that gate can see for itself.
+
+Why: rules decay unless someone keeps asking where they fall short. This gives
+whoever is asking, a person or an agent, a factual place to start: what is not
+checked at all, what could be tighter at no cost, and what the repo already
+does that no rule protects. It reports and never changes anything; judging
+which gaps matter, and finding the ones no tool can see, is the reader's job.
+"""
+
+from __future__ import annotations
+
+import json
+from dataclasses import asdict, dataclass
+from pathlib import Path
+
+from . import baseline, files, propose, rules
+from .checks import complexity, toolchain
+from .config import TOOLCHAIN
+from .context import Context
+from .files import matches
+
+
+@dataclass(frozen=True)
+class Gap:
+    area: str
+    message: str
+    suggestion: str = ""
+
+
+def find(ctx: Context) -> list[Gap]:
+    if not (ctx.root / "gate.toml").is_file():
+        return [Gap("config", "No gate.toml: only the default limits apply and no commands or boundaries are checked.",
+                    "Run `gate init`.")]
+    return [*_unchecked(ctx), *_boundaries(ctx), *_headroom(ctx), *_blind_spots(ctx), *_upkeep(ctx), *_ci(ctx)]
+
+
+# ---------------------------------------------------------- what never runs
+
+def _unchecked(ctx: Context) -> list[Gap]:
+    cfg = ctx.config
+    scheduled = {check for checks in cfg.profiles.values() for check in checks}
+    out = []
+    for category in TOOLCHAIN:
+        can_run = category in cfg.toolchain or toolchain.available(ctx, category)
+        if not can_run:
+            out.append(Gap("unchecked", f"Nothing checks `{category}`: no command is configured and no tool is installed.",
+                           f"Add a `{category}` command under `[toolchain]`, or install a tool for it."))
+        elif category not in scheduled:
+            out.append(Gap("unchecked", f"`{category}` can run here but no profile includes it.",
+                           f"Add \"{category}\" to a profile."))
+    if not cfg.tests:
+        out.append(Gap("unchecked", "No test command is configured, so tests are never part of the gate.",
+                       "Add `[tests.unit]` (and `[tests.integration]`) with the repo's test commands."))
+    for name in [*cfg.tests, *cfg.commands]:
+        if name not in scheduled:
+            out.append(Gap("unchecked", f"`{name}` is defined but no profile runs it.", f"Add \"{name}\" to a profile."))
+    return out
+
+
+# ------------------------------------------- structure nothing protects yet
+
+def _boundaries(ctx: Context) -> list[Gap]:
+    configured = ctx.config.boundaries
+    proposed = propose.boundary_rules(ctx.root, ctx.repo_files)
+    missing = [rule for rule in proposed if not _covered(rule, configured.forbid)]
+    if not missing:
+        return []
+    lead = ("No boundary rules are configured, but the code already keeps to some."
+            if not configured.forbid and not configured.only else
+            "The code already keeps to import directions that no rule protects.")
+    return [Gap("boundaries", f"{lead} One careless import would break each of these silently: {', '.join(f'`{r}`' for r in missing[:10])}.",
+                "Add the ones that are intent, not coincidence, to `[boundaries] forbid`.")]
+
+
+def _covered(rule: str, forbid: tuple[tuple[str, str], ...]) -> bool:
+    left, right = (part.strip() for part in rule.split("!->"))
+    return any(matches(left, a) and matches(right, b) for a, b in forbid)
+
+
+# ------------------------------------------- limits looser than they need be
+
+def _headroom(ctx: Context) -> list[Gap]:
+    """For each limit, the tightest value that would fail nothing that passes today."""
+    c, s = ctx.config.complexity, ctx.config.size
+    worst = {"ccn": 0, "lines": 0, "params": 0}
+    for _rel, fn in complexity.functions(ctx):
+        for rule, value, limit in (("ccn", fn.cyclomatic_complexity, c.ccn_fail), ("lines", fn.nloc, c.max_function_lines),
+                                   ("params", complexity.param_count(fn), c.max_parameters)):
+            if value <= limit:
+                worst[rule] = max(worst[rule], value)
+    longest = max((n for rel in ctx.code_files() if (n := _line_count(ctx.root / rel)) <= s.fail), default=0)
+    candidates = (
+        ("[complexity] ccn_fail", worst["ccn"], c.ccn_fail, "the most complex function that passes"),
+        ("[complexity] max_function_lines", worst["lines"], c.max_function_lines, "the longest function that passes"),
+        ("[complexity] max_parameters", worst["params"], c.max_parameters, "the widest signature that passes"),
+        ("[size] max_file_lines_fail", longest, s.fail, "the longest file that passes"),
+    )
+    return [
+        Gap("headroom", f"`{key}` is {limit}, but {what} is at {value}.",
+            f"It could be lowered to {value} today without failing anything new.")
+        for key, value, limit, what in candidates if 0 < value < limit
+    ]
+
+
+def _line_count(path: Path) -> int:
+    try:
+        with open(path, "rb") as f:
+            return sum(1 for _ in f)
+    except OSError:
+        return 0
+
+
+# ------------------------------------------------- what gate is told to skip
+
+def _blind_spots(ctx: Context) -> list[Gap]:
+    cfg = ctx.config
+    out = []
+    if cfg.exclude:
+        hidden = len(files.all_files(ctx.root)) - len(ctx.repo_files)
+        if hidden:
+            out.append(Gap("blind spots", f"{hidden} file(s) match `[files] exclude` and are never checked.",
+                           "Confirm each pattern still only covers generated or vendored code."))
+    for o in cfg.size.overrides:
+        if o.fail is not None and o.fail > cfg.size.fail:
+            out.append(Gap("blind spots", f"Files matching `{o.glob}` may reach {o.fail} lines instead of {cfg.size.fail}.",
+                           "Confirm the exception is still needed."))
+    return out
+
+
+# ----------------------------------------------------------------- upkeep
+
+def _upkeep(ctx: Context) -> list[Gap]:
+    from . import runner  # local import: runner depends on the checks this module also uses
+
+    out = []
+    recorded = baseline.load(ctx.root)
+    now = baseline.current(runner.structural_findings(ctx))
+    if baseline.pruned(recorded, now) != recorded:
+        out.append(Gap("upkeep", "The baseline records violations that have since been fixed or improved.",
+                       "Run `gate baseline --prune`."))
+    if recorded:
+        out.append(Gap("upkeep", f"{len(recorded)} violation(s) are tolerated by the baseline.",
+                       "Run `gate todo` for the next file to clean up."))
+    if rules.stale(ctx.root, ctx.config):
+        out.append(Gap("upkeep", "The rules written out for agents are missing or lag gate.toml.", "Run `gate rules`."))
+    return out
+
+
+def _ci(ctx: Context) -> list[Gap]:
+    workflows = [f for f in ctx.repo_files if f.startswith(".github/workflows/") and f.endswith((".yml", ".yaml"))]
+    if not workflows:
+        return []
+    for rel in workflows:
+        try:
+            if "gate check" in (ctx.root / rel).read_text(encoding="utf-8", errors="replace"):
+                return []
+        except OSError:
+            continue
+    return [Gap("ci", "This repo has CI workflows, but none runs `gate check`.",
+                "Add a step running `gate check --profile full --strict`.")]
+
+
+# ----------------------------------------------------------------- output
+
+def to_text(gaps: list[Gap]) -> str:
+    if not gaps:
+        return "gate gaps: none that gate can see. That is not the same as none: see what it cannot see."
+    lines = [f"gate gaps: {len(gaps)} that gate can see for itself"]
+    for area in dict.fromkeys(g.area for g in gaps):
+        lines.append(area)
+        for g in (g for g in gaps if g.area == area):
+            lines.append(f"  - {g.message}")
+            if g.suggestion:
+                lines.append(f"    {g.suggestion}")
+    lines.append("gate cannot see: tests that assert nothing, duplicated or dead code, unclear names, missing error handling.")
+    return "\n".join(lines)
+
+
+def to_json(gaps: list[Gap]) -> str:
+    return json.dumps({"gaps": [asdict(g) for g in gaps]}, indent=2, sort_keys=True)
+

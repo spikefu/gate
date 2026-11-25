@@ -50,9 +50,33 @@ def render(config: Config) -> str:
         "- Violations that predate these rules are recorded in `.gate/baseline.json`. Do not make them worse.",
         "- Never run `gate baseline --accept`, edit the baseline by hand, or change a limit to make a finding go away.",
         "- Never delete, skip, or loosen a test to get a check to pass.",
+        "",
+        *_IMPROVING,
         END,
     ]
     return "\n".join(lines) + "\n"
+
+
+# Without this, the rules above read as a fence to stay inside. They are also a
+# draft to be improved, and the agent working in the code sees its gaps first.
+_IMPROVING = [
+    "### Improving these rules",
+    "",
+    "These rules are a draft, and you are expected to challenge them. Passing the gate is the minimum; "
+    "noticing where it falls short is part of the work. As you go, look for:",
+    "",
+    "- a problem that got through because no rule or check covers it",
+    "- a limit that is looser than the code needs, or stricter than is useful",
+    "- a boundary the code keeps to that is not written down",
+    "- a finding that is wrong: say so instead of working around it",
+    "- a check that was skipped, or that no profile runs",
+    "",
+    "Run `gate gaps` for the weaknesses gate can see for itself, then add what only a reader of the code can see.",
+    "",
+    "Say what you found in your report, even when nobody asked, with the evidence and the exact change you propose: "
+    "the `gate.toml` edit, or a script to add as a `[[command]]` check when gate has no check for it. "
+    "Propose; do not apply. What the rules are is the human's decision.",
+]
 
 
 def _limits(config: Config) -> list[str]:

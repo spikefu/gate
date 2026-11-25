@@ -40,6 +40,7 @@ def test_blocks_with_the_finding_when_a_changed_file_fails(repo, request):
     decision = json.loads(out)
     assert code == 0 and decision["decision"] == "block"
     assert "a.py:1 f: CCN 21 > 15" in decision["reason"]
+    assert "If a finding is wrong" in decision["reason"] and "Do not work around it" in decision["reason"]
 
 
 def test_gives_up_and_tells_the_human_after_the_limit(repo, request):

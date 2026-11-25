@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import baseline, files, init, rules, runner, todo
+from . import baseline, files, gaps, init, rules, runner, todo
 from .config import ConfigError, load
 
 OK, FAILED, USAGE = 0, 1, 2
@@ -60,7 +60,11 @@ def _parser() -> argparse.ArgumentParser:
     mode.add_argument("--check", action="store_true", help="exit 1 if any instruction file is out of date")
     prose.set_defaults(handler=_rules)
 
-    for p in (check, base, queue, start, prose):
+    weak = sub.add_parser("gaps", help="list weaknesses in this repo's rules that gate can see for itself")
+    weak.add_argument("--json", action="store_true", help="machine-readable output")
+    weak.set_defaults(handler=_gaps)
+
+    for p in (check, base, queue, start, prose, weak):
         p.add_argument("--root", default=".", help="repo root (default: current directory)")
         p.add_argument("--config", help="path to gate.toml (default: <root>/gate.toml)")
     return parser
@@ -123,6 +127,12 @@ def _rules(args, root: Path, config) -> int:
         print(f"rules: wrote {path.relative_to(root)}")
     if not changed:
         print("rules: up to date")
+    return OK
+
+
+def _gaps(args, root: Path, config) -> int:
+    found = gaps.find(runner.build_context(root, config, None))
+    print(gaps.to_json(found) if args.json else gaps.to_text(found))
     return OK
 
 

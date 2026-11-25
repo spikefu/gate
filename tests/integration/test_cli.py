@@ -224,3 +224,14 @@ def test_baseline_check_ignores_new_violations_which_are_gate_checks_job(repo):
     repo.write("a.py", branchy("f", 40))
     assert gate(repo, "baseline", "--check")[0] == 0
     assert gate(repo, "check")[0] == 1
+
+
+def test_gaps_reports_and_never_fails_or_writes(repo):
+    repo.write("gate.toml", STRUCTURAL)
+    repo.write("a.py", branchy("f", 3))
+    repo.commit()
+    code, out, _ = gate(repo, "gaps")
+    assert code == 0 and "No test command is configured" in out
+    assert json.loads(gate(repo, "gaps", "--json")[1])["gaps"]
+    status = subprocess.run(["git", "-C", str(repo.root), "status", "--porcelain"], capture_output=True, text=True)
+    assert status.stdout == ""

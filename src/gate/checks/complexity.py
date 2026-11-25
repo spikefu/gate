@@ -6,6 +6,7 @@ blank lines never count against a function.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
 
 import lizard
@@ -20,7 +21,11 @@ EXTS = {
 
 
 def run(ctx: Context) -> list[Finding]:
-    findings: list[Finding] = []
+    return [finding for rel, fn in functions(ctx) for finding in _judge(ctx, rel, fn)]
+
+
+def functions(ctx: Context) -> Iterator[tuple[str, object]]:
+    """Every function lizard can measure in the files in play, with its file."""
     for rel in ctx.files:
         if Path(rel).suffix not in EXTS:
             continue
@@ -29,13 +34,12 @@ def run(ctx: Context) -> list[Finding]:
         except Exception:  # lizard cannot parse everything; syntax is another check's job
             continue
         for fn in analysis.function_list:
-            findings += _judge(ctx, rel, fn)
-    return findings
+            yield rel, fn
 
 
 def _judge(ctx: Context, rel: str, fn) -> list[Finding]:
     cfg = ctx.config.complexity
-    ccn, lines, params = fn.cyclomatic_complexity, fn.nloc, _param_count(fn)
+    ccn, lines, params = fn.cyclomatic_complexity, fn.nloc, param_count(fn)
     out = []
     if ccn > cfg.ccn_fail:
         out.append(_finding(rel, fn, ("ccn", ccn, cfg.ccn_fail), FAIL, "refactor"))
@@ -60,6 +64,6 @@ def _finding(rel: str, fn, measure: tuple[str, int, int], severity: str, advice:
     )
 
 
-def _param_count(fn) -> int:
+def param_count(fn) -> int:
     """Exclude the method receiver, which is not a real argument."""
     return sum(1 for p in fn.parameters if p not in ("self", "cls"))

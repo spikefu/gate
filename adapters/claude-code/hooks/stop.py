@@ -57,6 +57,8 @@ def _summary(report: dict) -> str:
             lines += ["    " + ln for ln in f["detail"].splitlines()[-15:]]
     if len(blocking) > MAX_LISTED:
         lines.append(f"... and {len(blocking) - MAX_LISTED} more")
+    lines.append("If a finding is wrong, or the rule behind it is, say so in your reply and propose the change "
+                 "to gate.toml. Do not work around it.")
     if report.get("strict"):
         lines += [f"- [{c}] could not run: {r}" for c, r in report["skipped"].items()]
     return "\n".join(lines)
