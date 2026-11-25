@@ -23,3 +23,6 @@ jobs:
         env:
           GATE_READ_TOKEN: ${{ secrets.GATE_READ_TOKEN }}
       - run: gate check --profile full --strict
+      # The baseline may only shrink, and agents must be told the current rules.
+      - run: gate baseline --check
+      - run: gate rules --check

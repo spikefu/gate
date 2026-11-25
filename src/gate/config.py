@@ -14,10 +14,10 @@ STRUCTURAL = ("syntax", "complexity", "size", "boundaries")
 TOOLCHAIN = ("lint", "typecheck", "format", "security", "deps")
 # Designed but not built yet. Accepted in config so a file written against the
 # design keeps loading; a profile that names one reports it as skipped.
-PLANNED = ("test-quality", "coverage", "docs", "scope", "imports", "rules")
+PLANNED = ("test-quality", "coverage", "docs", "scope", "imports")
 
 _TOP_LEVEL = {"version", "files", "profiles", "syntax", "complexity", "size", "boundaries",
-              "toolchain", "tests", "command", *PLANNED}
+              "toolchain", "tests", "command", "rules", *PLANNED}
 
 
 class ConfigError(Exception):
@@ -87,6 +87,8 @@ class Config:
     toolchain: dict[str, str] = field(default_factory=dict)
     tests: dict[str, Command] = field(default_factory=dict)
     commands: dict[str, Command] = field(default_factory=dict)
+    # Instruction files `gate rules` maintains; empty means "whichever exist".
+    rules_targets: tuple[str, ...] = ()
 
     def checks_for(self, profile: str | None) -> tuple[str, list[str]]:
         name = profile or self.default_profile
@@ -120,6 +122,7 @@ def load(path: Path | None) -> Config:
         toolchain=_toolchain(raw.get("toolchain", {})),
         tests=tests,
         commands=commands,
+        rules_targets=_rules_targets(raw.get("rules", {})),
     )
     return _with_profiles(cfg, raw.get("profiles", {}))
 
@@ -170,6 +173,13 @@ def _toolchain(table: dict) -> dict[str, str]:
     if unknown:
         raise ConfigError(f"[toolchain]: unknown key(s) {', '.join(sorted(unknown))}")
     return dict(table)
+
+
+def _rules_targets(table: dict) -> tuple[str, ...]:
+    unknown = set(table) - {"targets"}
+    if unknown:
+        raise ConfigError(f"[rules]: unknown key(s) {', '.join(sorted(unknown))}")
+    return tuple(table.get("targets", ()))
 
 
 def _with_profiles(cfg: Config, table: dict) -> Config:

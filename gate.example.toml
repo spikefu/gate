@@ -93,10 +93,12 @@ timeout_seconds = 1200
 
 [[command]]
 name = "a11y"
-run = "node .axe-check/check.js src/renderer"
+run = "node scripts/a11y-check.js"
 
 # ---------------------------------------------------------------- rules prose
-# `gate rules` writes a generated block into each target between markers.
+# `gate rules` writes these rules as prose into each target, between markers,
+# leaving the rest of the file alone. Omit this section to use whichever of
+# AGENTS.md and CLAUDE.md already exist (AGENTS.md if neither does).
 
 [rules]
 targets = ["AGENTS.md", "CLAUDE.md"]

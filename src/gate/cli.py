@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import baseline, files, init, runner, todo
+from . import baseline, files, init, rules, runner, todo
 from .config import ConfigError, load
 
 OK, FAILED, USAGE = 0, 1, 2
@@ -41,6 +41,8 @@ def _parser() -> argparse.ArgumentParser:
     group.add_argument("--prune", action="store_true", help="drop fixed entries and tighten improved ones")
     group.add_argument("--accept", action="store_true",
                        help="record every current violation; a human decision, not for automation")
+    group.add_argument("--check", action="store_true",
+                       help="exit 1 if --prune would change the baseline; makes it a ratchet in CI")
     base.set_defaults(handler=_baseline)
 
     queue = sub.add_parser("todo", help="list baselined violations as a work queue, worst file first")
@@ -52,7 +54,13 @@ def _parser() -> argparse.ArgumentParser:
     start.add_argument("--print", action="store_true", help="print the config instead of writing it")
     start.set_defaults(handler=_init)
 
-    for p in (check, base, queue, start):
+    prose = sub.add_parser("rules", help="write the rules as prose into AGENTS.md / CLAUDE.md")
+    mode = prose.add_mutually_exclusive_group()
+    mode.add_argument("--print", action="store_true", help="print the section instead of writing it")
+    mode.add_argument("--check", action="store_true", help="exit 1 if any instruction file is out of date")
+    prose.set_defaults(handler=_rules)
+
+    for p in (check, base, queue, start, prose):
         p.add_argument("--root", default=".", help="repo root (default: current directory)")
         p.add_argument("--config", help="path to gate.toml (default: <root>/gate.toml)")
     return parser
@@ -88,8 +96,33 @@ def _baseline(args, root: Path, config) -> int:
             baseline.save(root, kept)
         print(f"baseline: removed {fixed} fixed, tightened {tightened}, {len(kept)} remain")
         return OK
+    if args.check:
+        if kept == recorded:
+            print(f"baseline: up to date, {len(recorded)} recorded")
+            return OK
+        print(f"baseline: stale, {fixed} fixed and {tightened} improved but still recorded. Run `gate baseline --prune`.")
+        return FAILED
     new = sum(1 for k, v in now.items() if _is_new(recorded, k, v))
     print(f"baseline: {len(recorded)} recorded, {fixed} now fixed, {tightened} improved, {new} new or worsened")
+    return OK
+
+
+def _rules(args, root: Path, config) -> int:
+    if args.print:
+        print(rules.render(config), end="")
+        return OK
+    if args.check:
+        behind = rules.stale(root, config)
+        for path in behind:
+            print(f"rules: {path.relative_to(root)} is out of date. Run `gate rules`.")
+        if not behind:
+            print("rules: up to date")
+        return FAILED if behind else OK
+    changed = rules.write(root, config)
+    for path in changed:
+        print(f"rules: wrote {path.relative_to(root)}")
+    if not changed:
+        print("rules: up to date")
     return OK
 
 

@@ -169,3 +169,58 @@ def test_todo_is_the_baseline_worst_first_and_shrinks_as_work_is_done(repo):
     report = json.loads(gate(repo, "todo", "--json")[1])
     assert ([f["path"] for f in report["files"]], report["stale"]) == (["mild.py"], 1)
     assert "run `gate baseline --prune`" in gate(repo, "todo")[1]
+
+
+def test_rules_check_fails_until_written_and_again_after_the_config_changes(repo):
+    repo.write("gate.toml", STRUCTURAL)
+    assert gate(repo, "rules", "--check")[0] == 1
+    assert not (repo.root / "AGENTS.md").exists(), "--check must not write"
+
+    code, out, _ = gate(repo, "rules")
+    assert code == 0 and "wrote AGENTS.md" in out
+    assert gate(repo, "rules", "--check")[0] == 0
+    assert "up to date" in gate(repo, "rules")[1]
+
+    repo.write("gate.toml", STRUCTURAL + "[complexity]\nccn_fail = 12\n")
+    code, out, _ = gate(repo, "rules", "--check")
+    assert code == 1 and "AGENTS.md is out of date" in out
+    gate(repo, "rules")
+    assert "at most 12" in (repo.root / "AGENTS.md").read_text()
+
+
+def test_rules_print_writes_nothing(repo):
+    code, out, _ = gate(repo, "rules", "--print")
+    assert code == 0 and out.startswith("<!-- gate:rules:start -->")
+    assert not (repo.root / "AGENTS.md").exists()
+
+
+def test_baseline_check_is_a_ratchet(repo):
+    repo.write("gate.toml", STRUCTURAL)
+    repo.write("a.py", branchy("f", 30))
+    repo.write("b.py", branchy("g", 30))
+    assert gate(repo, "baseline", "--check")[0] == 0, "nothing recorded is nothing stale"
+    gate(repo, "baseline", "--accept")
+    assert gate(repo, "baseline", "--check")[0] == 0
+
+    repo.write("a.py", branchy("f", 20))  # improved, still over the limit
+    code, out, _ = gate(repo, "baseline", "--check")
+    assert code == 1 and "0 fixed and 1 improved" in out
+    before = (repo.root / ".gate/baseline.json").read_text()
+
+    repo.write("b.py", branchy("g", 2))  # fixed
+    code, out, _ = gate(repo, "baseline", "--check")
+    assert code == 1 and "1 fixed and 1 improved" in out
+    assert (repo.root / ".gate/baseline.json").read_text() == before, "--check must not write"
+
+    gate(repo, "baseline", "--prune")
+    assert gate(repo, "baseline", "--check")[0] == 0
+
+
+def test_baseline_check_ignores_new_violations_which_are_gate_checks_job(repo):
+    repo.write("gate.toml", STRUCTURAL)
+    repo.write("a.py", branchy("f", 30))
+    gate(repo, "baseline", "--accept")
+    repo.write("new.py", branchy("h", 30))
+    repo.write("a.py", branchy("f", 40))
+    assert gate(repo, "baseline", "--check")[0] == 0
+    assert gate(repo, "check")[0] == 1

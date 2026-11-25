@@ -33,8 +33,9 @@ and defaults; each repo declares its own limits, boundaries and commands in
 |---|---|
 | `gate init` | Write a starter `gate.toml` from what the repo already does |
 | `gate check [paths]` | Run the checks, print findings, exit 0 or 1 |
-| `gate baseline` | Report, accept (`--accept`) or shrink (`--prune`) recorded violations |
+| `gate baseline` | Report, accept (`--accept`) or shrink (`--prune`) recorded violations; `--check` fails if it is stale |
 | `gate todo` | List the baseline as a work queue, worst file first |
+| `gate rules` | Write the rules as prose into `AGENTS.md` / `CLAUDE.md`; `--check` fails if they lag `gate.toml` |
 
 `gate check` flags: `--changed [--base REF]` for the git diff plus untracked
 files, `--profile NAME`, `--json`, `--strict`.
@@ -95,6 +96,17 @@ to be committed.
 - `--prune` only shrinks: it drops fixed entries and tightens improved ones.
 - `--accept` is the only way entries are added. It is a human decision; no
   adapter runs it.
+- `--check` fails when `--prune` would change the file. In CI that makes the
+  baseline a ratchet: a fix has to be recorded before it can merge, and from
+  then on it cannot be undone without failing.
+
+## Rules as prose
+
+`gate rules` renders the config into the instruction files agents read. The
+section sits between `<!-- gate:rules:start -->` and `<!-- gate:rules:end -->`;
+everything outside the markers belongs to the file's author and is never
+touched. Because the prose is generated from the same file the checks read,
+an agent is never told one limit and held to another.
 
 ## Extending
 
@@ -116,6 +128,7 @@ src/gate/
   init.py           starter config from an unseen repo
   propose.py        boundary rules from existing imports
   todo.py           the baseline as a work queue
+  rules.py          the config as prose for agent instruction files
   checks/           one module per check
   lang/             import graph and JS/TS module resolution
 adapters/
@@ -125,10 +138,6 @@ adapters/
 
 ## Not built yet
 
-- `gate rules`: render the config as prose into `AGENTS.md` / `CLAUDE.md`, so
-  what an agent is told and what is enforced cannot drift.
-- `gate baseline --check`: fail when the baseline is stale, so CI makes it a
-  ratchet.
 - Checks: test quality (tests with no real assertion), coverage, scope (diff
   stays inside declared files), required READMEs, imports of symbols a module
   does not export.

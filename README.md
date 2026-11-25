@@ -28,6 +28,7 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 gate init                       # writes gate.toml from the repo's own scripts and imports
 gate check                      # see what breaks the rules today
 gate baseline --accept          # record that as the starting point (your decision)
+gate rules                      # tell agents the rules, in AGENTS.md / CLAUDE.md
 gate todo                       # the baseline as a work queue, worst file first
 ```
 
@@ -45,7 +46,15 @@ gate baseline                   # report what is recorded, fixed, and new
 gate baseline --accept          # record today's violations (a human decision)
 gate baseline --prune           # drop fixed entries, tighten improved ones
 gate todo --next 1 --json       # the next file to clean up
+gate rules --check              # exit 1 if AGENTS.md / CLAUDE.md lag gate.toml
+gate baseline --check           # exit 1 if fixed violations are still recorded
 ```
+
+`gate rules` renders `gate.toml` as prose between two markers in your
+instruction files and leaves the rest of each file alone, so what an agent is
+told and what is enforced cannot drift. The two `--check` forms are for CI:
+one keeps that prose current, the other makes the baseline a ratchet that
+only shrinks.
 
 Exit codes: 0 clean, 1 findings, 2 config or usage error.
 
