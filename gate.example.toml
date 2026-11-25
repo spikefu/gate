@@ -1,0 +1,102 @@
+# Every option gate.toml accepts, with illustrative values for a TypeScript
+# monorepo (apps/server, apps/client, packages/shared). Copy what you need;
+# `gate init` writes a starter file for your own repo.
+
+version = 1
+
+[files]
+exclude = ["**/node_modules/**", "**/dist/**", "**/build/**", "**/*.generated.*"]
+
+# ---------------------------------------------------------------- profiles
+# A profile is a named list of checks. Adapters pick one.
+
+[profiles]
+fast = ["syntax", "complexity", "size", "boundaries", "lint"]          # agent hook: seconds, changed files
+full = ["syntax", "complexity", "size", "boundaries", "lint",
+        "typecheck", "unit", "integration", "test-quality", "docs"]    # CI and pre-merge
+default = "fast"
+
+# ---------------------------------------------------------------- structure
+
+[syntax]
+# Parse errors block only when a native parser confirms them (Python, TOML).
+# List a language here to make its tree-sitter errors block too.
+fail_on = []
+
+[complexity]              # these are the defaults
+ccn_warn = 10
+ccn_fail = 15
+max_function_lines = 120
+max_parameters = 5
+
+[size]                    # these are the defaults
+max_file_lines_warn = 300
+max_file_lines_fail = 500
+
+[[size.override]]         # tests and fixtures are allowed to be long
+glob = "**/*.test.ts"
+max_file_lines_fail = 1000
+
+[boundaries]
+# Forbidden direction: the left side may not import the right side.
+forbid = [
+  "packages/shared !-> apps",
+  "apps/client !-> apps/server",
+]
+
+# Ports and adapters: only the named layer may import the target.
+[[boundaries.only]]
+target = "apps/server/src/db"
+allowed_from = ["apps/server/src/modules"]
+applies_to = ["apps/server/src"]   # optional: which importers the rule governs
+why = "Database access stays behind module interfaces."
+
+# ---------------------------------------------------------------- toolchain
+# Omit a command to let gate auto-detect (ruff, eslint, tsc, ...).
+# An explicit command always wins.
+
+[toolchain]
+lint = "npm run lint --silent"
+typecheck = "npm run typecheck --silent"
+# format, security, deps: auto-detect
+
+# ---------------------------------------------------------------- tests
+
+[tests.unit]
+command = "npm test --silent"
+timeout_seconds = 300
+
+[tests.integration]
+command = "npm run test:integration --silent"
+timeout_seconds = 900
+
+[test-quality]
+globs = ["**/*.test.ts", "**/*.spec.ts", "tests/**/*.py"]
+severity = "warn"         # start as a warning; raise to "fail" once the baseline is clean
+
+[coverage]
+min_percent = 0           # 0 disables
+
+# ---------------------------------------------------------------- orientation
+
+[docs]
+# Every directory matching these globs needs a README.md.
+readme_required = ["apps/*", "packages/*"]
+
+# ---------------------------------------------------------------- project scripts
+# Anything with an exit code. Add the name to a profile to run it.
+
+[[command]]
+name = "e2e"
+run = "npx playwright test"
+timeout_seconds = 1200
+
+[[command]]
+name = "a11y"
+run = "node .axe-check/check.js src/renderer"
+
+# ---------------------------------------------------------------- rules prose
+# `gate rules` writes a generated block into each target between markers.
+
+[rules]
+targets = ["AGENTS.md", "CLAUDE.md"]

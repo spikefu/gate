@@ -1,0 +1,19 @@
+# gate checks itself with its own defaults.
+
+[tests.unit]
+command = ".venv/bin/pytest -q tests/unit"
+
+[tests.integration]
+command = ".venv/bin/pytest -q tests/integration"
+
+[boundaries]
+# Checks are leaves: nothing below them may depend on the runner or the CLI.
+forbid = [
+  "src/gate/checks !-> src/gate/runner.py",
+  "src/gate/checks !-> src/gate/cli.py",
+  "src/gate/lang !-> src/gate/checks",
+]
+
+[profiles]
+fast = ["syntax", "complexity", "size", "boundaries", "lint"]
+full = ["syntax", "complexity", "size", "boundaries", "lint", "unit", "integration"]

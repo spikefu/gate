@@ -1,0 +1,5 @@
+{
+  "name": "gate",
+  "description": "Runs `gate check --changed` when Claude stops, and sends failures back to be fixed.",
+  "version": "0.1.0"
+}

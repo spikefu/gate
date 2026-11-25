@@ -1,0 +1,133 @@
+"""Command line entry point. Exit codes are the contract: 0 clean, 1 findings, 2 misuse."""
+
+from __future__ import annotations
+
+import argparse
+import sys
+from pathlib import Path
+
+from . import baseline, files, init, runner, todo
+from .config import ConfigError, load
+
+OK, FAILED, USAGE = 0, 1, 2
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = _parser().parse_args(argv)
+    try:
+        root = Path(args.root).resolve()
+        config = load(Path(args.config) if args.config else root / "gate.toml")
+        return args.handler(args, root, config)
+    except (ConfigError, files.NotARepo, ValueError) as e:
+        print(f"gate: {e}", file=sys.stderr)
+        return USAGE
+
+
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(prog="gate", description="Check a repo against its declared rules.")
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    check = sub.add_parser("check", help="run the checks; exit 1 on findings")
+    check.add_argument("paths", nargs="*", help="files or directories (default: whole repo)")
+    check.add_argument("--changed", action="store_true", help="only files in the git diff, plus untracked")
+    check.add_argument("--base", default="HEAD", help="git ref --changed compares against")
+    check.add_argument("--profile", help="named set of checks from gate.toml")
+    check.add_argument("--json", action="store_true", help="machine-readable output")
+    check.add_argument("--strict", action="store_true", help="a check that could not run is a failure")
+    check.set_defaults(handler=_check)
+
+    base = sub.add_parser("baseline", help="show, shrink, or accept recorded violations")
+    group = base.add_mutually_exclusive_group()
+    group.add_argument("--prune", action="store_true", help="drop fixed entries and tighten improved ones")
+    group.add_argument("--accept", action="store_true",
+                       help="record every current violation; a human decision, not for automation")
+    base.set_defaults(handler=_baseline)
+
+    queue = sub.add_parser("todo", help="list baselined violations as a work queue, worst file first")
+    queue.add_argument("--next", type=int, metavar="N", help="show only the first N files")
+    queue.add_argument("--json", action="store_true", help="machine-readable output")
+    queue.set_defaults(handler=_todo)
+
+    start = sub.add_parser("init", help="write a starter gate.toml from what the repo already does")
+    start.add_argument("--print", action="store_true", help="print the config instead of writing it")
+    start.set_defaults(handler=_init)
+
+    for p in (check, base, queue, start):
+        p.add_argument("--root", default=".", help="repo root (default: current directory)")
+        p.add_argument("--config", help="path to gate.toml (default: <root>/gate.toml)")
+    return parser
+
+
+def _check(args, root: Path, config) -> int:
+    exclude = config.exclude
+    if args.changed:
+        selected, mode = files.changed_files(root, args.base, exclude), "changed"
+    elif args.paths:
+        selected, mode = files.explicit_files(root, args.paths, exclude), "paths"
+    else:
+        selected, mode = None, "all"
+    ctx = runner.build_context(root, config, selected)
+    report = runner.run(ctx, args.profile, mode, strict=args.strict)
+    print(report.to_json() if args.json else report.to_text())
+    return OK if report.ok else FAILED
+
+
+def _baseline(args, root: Path, config) -> int:
+    ctx = runner.build_context(root, config, None)
+    now = baseline.current(runner.structural_findings(ctx))
+    recorded = baseline.load(root)
+    if args.accept:
+        baseline.save(root, now)
+        print(f"baseline: accepted {len(now)} violation(s) into {baseline.FILE}")
+        return OK
+    kept = baseline.pruned(recorded, now)
+    fixed = len(recorded) - len(kept)
+    tightened = sum(1 for k in kept if kept[k] != recorded[k])
+    if args.prune:
+        if kept != recorded:
+            baseline.save(root, kept)
+        print(f"baseline: removed {fixed} fixed, tightened {tightened}, {len(kept)} remain")
+        return OK
+    new = sum(1 for k, v in now.items() if _is_new(recorded, k, v))
+    print(f"baseline: {len(recorded)} recorded, {fixed} now fixed, {tightened} improved, {new} new or worsened")
+    return OK
+
+
+def _todo(args, root: Path, config) -> int:
+    ctx = runner.build_context(root, config, None)
+    recorded = baseline.load(root)
+    found = baseline.apply(runner.structural_findings(ctx), recorded)
+    todos = todo.queue([f for f in found if f.baselined])
+    stale = len(recorded) - len(baseline.pruned(recorded, baseline.current(found)))
+    shown = todos if args.next is None else todos[:args.next]
+    render = todo.to_json if args.json else todo.to_text
+    print(render(todos, shown, stale))
+    return OK
+
+
+def _init(args, root: Path, config) -> int:
+    target = root / "gate.toml"
+    if target.exists() and not args.print:
+        raise ValueError(f"{target} already exists; edit it, or delete it to start over")
+    ctx = runner.build_context(root, config, None)
+    text = init.render(init.plan(ctx))
+    if args.print:
+        print(text)
+        return OK
+    target.write_text(text, encoding="utf-8")
+    failing = [f for f in runner.structural_findings(runner.build_context(root, load(target), None)) if f.blocks()]
+    print(f"wrote {target}")
+    print(f"{len(failing)} structural violation(s) today in {len({f.path for f in failing})} file(s).")
+    print("Next: review gate.toml, run `gate check`, then fix what it reports or `gate baseline --accept`.")
+    return OK
+
+
+def _is_new(recorded: dict, key: str, value) -> bool:
+    if key not in recorded:
+        return True
+    prior = recorded[key]
+    return prior is not None and value is not None and value > prior
+
+
+if __name__ == "__main__":
+    sys.exit(main())

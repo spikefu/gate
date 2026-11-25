@@ -1,0 +1,25 @@
+# Copy to .github/workflows/gate.yml in a repo that has a gate.toml.
+#
+# --strict makes a check that could not run a failure, so CI never passes
+# because a linter was missing. Install your project's own tools (npm ci,
+# pip install, ...) before the gate step so the toolchain checks can run.
+name: gate
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      # spikefu/gate is private: add a GATE_READ_TOKEN secret to this repo, a
+      # fine-grained token with read access to that repository's contents.
+      - run: pip install "git+https://x-access-token:${GATE_READ_TOKEN}@github.com/spikefu/gate@main"
+        env:
+          GATE_READ_TOKEN: ${{ secrets.GATE_READ_TOKEN }}
+      - run: gate check --profile full --strict
