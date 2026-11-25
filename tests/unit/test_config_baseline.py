@@ -50,31 +50,66 @@ def test_unknown_profile_is_an_error(tmp_path):
 
 
 def test_baseline_covers_equal_or_better_but_not_worse():
-    entries = {"complexity/ccn:a.py::f": 20}
+    entries = {"complexity/ccn:a.py::f": [20]}
     same, better, worse = (baseline.apply([finding(value=v)], entries)[0] for v in (20, 18, 21))
     assert same.baselined and better.baselined
     assert not worse.baselined and worse.blocks()
 
 
 def test_baseline_never_covers_tests_lint_or_warnings():
-    entries = {"unit:exit-code": None, "k": 5}
+    entries = {"unit:exit-code": [None], "k": [5]}
     test_failure = finding(key="unit:exit-code", check="unit", value=None)
     warning = finding(key="k", value=5, severity="warn")
     assert [f.baselined for f in baseline.apply([test_failure, warning], entries)] == [False, False]
 
 
-def test_current_keeps_worst_value_for_shared_key():
-    assert baseline.current([finding(value=17), finding(value=30)]) == {"complexity/ccn:a.py::f": 30}
+def test_each_recorded_value_covers_one_finding_so_new_functions_cannot_hide_behind_a_shared_name():
+    # Anonymous functions, and same-named methods, share a key.
+    entries = {"complexity/ccn:a.py::f": [21]}
+    original, added, another = baseline.apply([finding(value=21), finding(value=20), finding(value=19)], entries)
+    assert original.baselined
+    assert added.blocks() and another.blocks()
+
+
+def test_shared_key_findings_are_paired_worst_with_worst_whatever_order_they_arrive_in():
+    entries = {"complexity/ccn:a.py::f": [30, 17]}
+    flags = [f.baselined for f in baseline.apply([finding(value=16), finding(value=30), finding(value=18)], entries)]
+    # 30 pairs with 30, 18 is over the 17 it pairs with, and 16 has nothing left to pair with.
+    assert flags == [False, True, False]
+
+
+def test_apply_keeps_findings_in_their_original_order():
+    found = [finding(value=16), finding(key="other", value=40), finding(value=30)]
+    assert [f.value for f in baseline.apply(found, {"complexity/ccn:a.py::f": [30, 16]})] == [16, 40, 30]
+
+
+def test_current_records_every_finding_under_a_shared_key_worst_first():
+    assert baseline.current([finding(value=17), finding(value=30)]) == {"complexity/ccn:a.py::f": [30, 17]}
+
+
+def test_violations_without_a_measure_are_counted_too():
+    edge = lambda: finding(key="boundaries:a->b", check="boundaries", value=None)  # noqa: E731
+    assert baseline.current([edge(), edge()]) == {"boundaries:a->b": [None, None]}
+    flags = [f.baselined for f in baseline.apply([edge(), edge(), edge()], {"boundaries:a->b": [None, None]})]
+    assert flags == [True, True, False]
 
 
 def test_prune_only_shrinks():
-    recorded = {"fixed": 20, "improved": 20, "worse": 20}
-    now = {"improved": 16, "worse": 25, "brand-new": 40}
-    assert baseline.pruned(recorded, now) == {"improved": 16, "worse": 20}
+    recorded = {"fixed": [20], "improved": [20], "worse": [20], "shared": [30, 25, 20]}
+    now = {"improved": [16], "worse": [25], "brand-new": [40], "shared": [28, 26]}
+    assert baseline.pruned(recorded, now) == {"improved": [16], "worse": [20], "shared": [28, 25]}
+    assert baseline.tightened(recorded, baseline.pruned(recorded, now)) == 2
+    assert (baseline.size(recorded), baseline.size(baseline.pruned(recorded, now))) == (6, 4)
 
 
 def test_save_is_sorted_and_round_trips(tmp_path):
-    baseline.save(tmp_path, {"b": 2, "a": 1})
+    baseline.save(tmp_path, {"b": [2, 9], "a": [1]})
     text = (tmp_path / baseline.FILE).read_text()
     assert text.index('"a"') < text.index('"b"')
-    assert baseline.load(tmp_path) == {"a": 1, "b": 2}
+    assert baseline.load(tmp_path) == {"a": [1], "b": [9, 2]}
+
+
+def test_a_version_1_baseline_with_one_value_per_key_still_loads(tmp_path):
+    (tmp_path / ".gate").mkdir()
+    (tmp_path / baseline.FILE).write_text('{"version": 1, "entries": {"k": 20, "edge": null}}')
+    assert baseline.load(tmp_path) == {"k": [20], "edge": [None]}

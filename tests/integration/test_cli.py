@@ -235,3 +235,75 @@ def test_gaps_reports_and_never_fails_or_writes(repo):
     assert json.loads(gate(repo, "gaps", "--json")[1])["gaps"]
     status = subprocess.run(["git", "-C", str(repo.root), "status", "--porcelain"], capture_output=True, text=True)
     assert status.stdout == ""
+
+
+def anonymous(*branch_counts):
+    """A TypeScript file of anonymous functions, which all share the name `(anonymous)`."""
+    body = lambda n: "(x: number) => { " + " ".join(f"if (x === {i}) return {i};" for i in range(n)) + " return -1 },\n"  # noqa: E731
+    return "export const handlers = [" + "".join(body(n) for n in branch_counts) + "]\n"
+
+
+def test_new_anonymous_functions_cannot_hide_behind_a_baselined_one(repo):
+    repo.write("gate.toml", STRUCTURAL)
+    repo.write("a.ts", anonymous(20))
+    gate(repo, "baseline", "--accept")
+    assert gate(repo, "check")[0] == 0
+
+    repo.write("a.ts", anonymous(20, 19, 18))
+    code, report = check_json(repo)
+    assert code == 1
+    assert sorted((f["value"], f["baselined"]) for f in report["findings"]) == [(19, False), (20, False), (21, True)]
+
+    # Accepting all three records all three, and fixing one is then noticed.
+    gate(repo, "baseline", "--accept")
+    assert json.loads((repo.root / ".gate/baseline.json").read_text())["entries"] == {"complexity/ccn:a.ts::(anonymous)": [21, 20, 19]}
+    repo.write("a.ts", anonymous(20, 18))
+    code, out, _ = gate(repo, "baseline", "--check")
+    assert code == 1 and "1 fixed" in out
+
+
+def test_scoped_tool_failure_in_a_similarly_named_file_does_not_block(repo):
+    repo.write("gate.toml", '[toolchain]\nlint = "echo data.py:1 bad; exit 1"\n[profiles]\nfast = ["lint"]\n')
+    repo.write("data.py", "x = 1\n")
+    repo.commit()
+    repo.write("a.py", "y = 1\n")
+    code, report = check_json(repo, "--changed")
+    assert code == 0 and report["findings"][0]["severity"] == "warn"
+
+
+def test_scoped_tool_failure_naming_the_changed_file_blocks_however_the_path_is_written(repo):
+    repo.write("pkg/src/a.py", "x = 1\n")
+    repo.write("gate.toml", "placeholder = 1\n")
+    repo.commit()
+    repo.write("pkg/src/a.py", "x = 2\n")
+    for printed in ("pkg/src/a.py:1:1", "./pkg/src/a.py(1,1)", f"{repo.root.resolve().as_posix()}/pkg/src/a.py:1", "src/a.py:1"):
+        repo.write("gate.toml", f'[toolchain]\nlint = "echo \'{printed} bad\'; exit 1"\n[profiles]\nfast = ["lint"]\n')
+        code, report = check_json(repo, "--changed")
+        assert code == 1, printed
+        assert report["findings"][0]["severity"] == "fail", printed
+
+
+def test_scoped_tool_that_fails_without_naming_any_file_blocks(repo):
+    # A crashed or misconfigured tool checked nothing, so it must not pass as "not your files".
+    repo.write("gate.toml", '[toolchain]\nlint = "echo linter config is invalid; exit 2"\n[profiles]\nfast = ["lint"]\n')
+    repo.write("old.py", "x = 1\n")
+    repo.commit()
+    repo.write("new.py", "y = 1\n")
+    code, report = check_json(repo, "--changed")
+    assert code == 1
+    assert "without naming a file" in report["findings"][0]["message"]
+
+
+def test_old_format_baseline_stops_covering_extra_same_named_functions_and_says_why(repo):
+    repo.write("gate.toml", STRUCTURAL)
+    repo.write("a.ts", anonymous(28, 24))
+    repo.write(".gate/baseline.json", json.dumps({"version": 1, "entries": {"complexity/ccn:a.ts::(anonymous)": 29}}))
+    code, report = check_json(repo)
+    assert code == 1
+    assert sorted((f["value"], f["baselined"]) for f in report["findings"]) == [(25, False), (29, True)]
+    out = gate(repo, "baseline")[1]
+    assert "1 new or worsened" in out and "old format" in out and "--accept" in out
+
+    gate(repo, "baseline", "--accept")
+    assert gate(repo, "check")[0] == 0
+    assert "old format" not in gate(repo, "baseline")[1]

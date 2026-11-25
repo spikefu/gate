@@ -96,7 +96,8 @@ agent change `gate.toml`, a limit, or the baseline by itself.
 | `[tests.<name>]`, `[[command]]` | exit code of your own command |
 
 Only `complexity`, `size` and `boundaries` can be baselined. A baselined
-finding that gets worse fails again.
+finding that gets worse fails again, and each recorded value covers one
+finding, so a new function cannot hide behind an old one with the same name.
 
 ## Adapters
 

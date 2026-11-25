@@ -86,28 +86,33 @@ def _check(args, root: Path, config) -> int:
 
 def _baseline(args, root: Path, config) -> int:
     ctx = runner.build_context(root, config, None)
-    now = baseline.current(runner.structural_findings(ctx))
+    found = runner.structural_findings(ctx)
+    now = baseline.current(found)
     recorded = baseline.load(root)
     if args.accept:
         baseline.save(root, now)
-        print(f"baseline: accepted {len(now)} violation(s) into {baseline.FILE}")
+        print(f"baseline: accepted {baseline.size(now)} violation(s) into {baseline.FILE}")
         return OK
     kept = baseline.pruned(recorded, now)
-    fixed = len(recorded) - len(kept)
-    tightened = sum(1 for k in kept if kept[k] != recorded[k])
+    fixed = baseline.size(recorded) - baseline.size(kept)
+    tightened = baseline.tightened(recorded, kept)
     if args.prune:
         if kept != recorded:
             baseline.save(root, kept)
-        print(f"baseline: removed {fixed} fixed, tightened {tightened}, {len(kept)} remain")
+        print(f"baseline: removed {fixed} fixed, tightened {tightened}, {baseline.size(kept)} remain")
         return OK
     if args.check:
         if kept == recorded:
-            print(f"baseline: up to date, {len(recorded)} recorded")
+            print(f"baseline: up to date, {baseline.size(recorded)} recorded")
             return OK
         print(f"baseline: stale, {fixed} fixed and {tightened} improved but still recorded. Run `gate baseline --prune`.")
         return FAILED
-    new = sum(1 for k, v in now.items() if _is_new(recorded, k, v))
-    print(f"baseline: {len(recorded)} recorded, {fixed} now fixed, {tightened} improved, {new} new or worsened")
+    new = sum(1 for f in baseline.apply(found, recorded) if f.blocks())
+    print(f"baseline: {baseline.size(recorded)} recorded, {fixed} now fixed, {tightened} improved, {new} new or worsened")
+    if new and baseline.is_legacy(root):
+        print("note: this baseline is in the old format, which kept one value per function name. Functions that "
+              "shared a name with a recorded one used to be covered and no longer are. Review `gate check`, then "
+              "run `gate baseline --accept` once to record them.")
     return OK
 
 
@@ -141,7 +146,7 @@ def _todo(args, root: Path, config) -> int:
     recorded = baseline.load(root)
     found = baseline.apply(runner.structural_findings(ctx), recorded)
     todos = todo.queue([f for f in found if f.baselined])
-    stale = len(recorded) - len(baseline.pruned(recorded, baseline.current(found)))
+    stale = baseline.size(recorded) - baseline.size(baseline.pruned(recorded, baseline.current(found)))
     shown = todos if args.next is None else todos[:args.next]
     render = todo.to_json if args.json else todo.to_text
     print(render(todos, shown, stale))
@@ -163,13 +168,6 @@ def _init(args, root: Path, config) -> int:
     print(f"{len(failing)} structural violation(s) today in {len({f.path for f in failing})} file(s).")
     print("Next: review gate.toml, run `gate check`, then fix what it reports or `gate baseline --accept`.")
     return OK
-
-
-def _is_new(recorded: dict, key: str, value) -> bool:
-    if key not in recorded:
-        return True
-    prior = recorded[key]
-    return prior is not None and value is not None and value > prior
 
 
 if __name__ == "__main__":

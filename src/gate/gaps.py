@@ -139,7 +139,7 @@ def _upkeep(ctx: Context) -> list[Gap]:
         out.append(Gap("upkeep", "The baseline records violations that have since been fixed or improved.",
                        "Run `gate baseline --prune`."))
     if recorded:
-        out.append(Gap("upkeep", f"{len(recorded)} violation(s) are tolerated by the baseline.",
+        out.append(Gap("upkeep", f"{baseline.size(recorded)} violation(s) are tolerated by the baseline.",
                        "Run `gate todo` for the next file to clean up."))
     if rules.stale(ctx.root, ctx.config):
         out.append(Gap("upkeep", "The rules written out for agents are missing or lag gate.toml.", "Run `gate rules`."))

@@ -88,13 +88,22 @@ moves. The baseline matches on it.
 Boundaries follow relative imports, tsconfig `paths` aliases and workspace
 package names for JS/TS, and absolute and relative imports for Python.
 
-On a `--changed` run, a project-wide tool that fails somewhere outside the
-changed files warns instead of blocking.
+On a `--changed` run, a project-wide tool that fails only in files outside the
+change warns instead of blocking. Files are recognised in its output as whole
+paths (absolute, repo-relative, or relative to a subdirectory), never as
+substrings. A tool that fails without naming any file blocks: it crashed or is
+misconfigured, so it checked nothing.
 
 ## Baseline
 
-`.gate/baseline.json` maps finding keys to their values, sorted, and is meant
-to be committed.
+`.gate/baseline.json` maps each finding key to the values recorded under it,
+worst first, and is meant to be committed.
+
+- Each recorded value covers exactly one finding. A key is a file and a
+  function name, and names repeat: every anonymous function shares one. If a
+  key held a single value, any number of new functions could hide behind the
+  first. Findings under one key are paired with its recorded values worst with
+  worst, and any left over fail.
 
 - Only `complexity`, `size` and `boundaries` can be baselined. A failing test
   suite or linter is never grandfathered.

@@ -1,13 +1,13 @@
 """Runs the ecosystem's own tools: linter, type checker, formatter, security, dependency audit.
 
 An explicit command in gate.toml always wins. Otherwise the first installed
-tool for each language in play is used. A
-missing tool is reported as skipped, never as a failure; `--strict` turns
-skips into failures where that matters (CI).
+tool for each language in play is used. A missing tool is reported as skipped,
+never as a failure; `--strict` turns skips into failures where that matters (CI).
 """
 
 from __future__ import annotations
 
+import re
 import shutil
 from dataclasses import dataclass
 from pathlib import Path
@@ -96,10 +96,15 @@ def _judge(ctx: Context, category: str, tool: str, result: tuple[int | None, str
         return []
     if code is None:
         return [_finding(category, tool, FAIL, f"{tool} timed out after {TIMEOUT}s", output)]
-    # On a scoped run, a project-wide tool failing somewhere else is not this
-    # change's fault: report it, but do not block.
-    if project_wide and ctx.scoped and not _mentions(output, ctx.files):
-        return [_finding(category, tool, WARN, f"{tool} fails, but not in the files being checked", output)]
+    if project_wide and ctx.scoped:
+        named = _named_files(output, ctx)
+        # It failed somewhere else: not this change's fault, so report without blocking.
+        if named and named.isdisjoint(ctx.files):
+            return [_finding(category, tool, WARN, f"{tool} fails, but not in the files being checked", output)]
+        # It named no file at all (a crash, a bad config). That cannot be pinned
+        # on other files, and a broken tool checks nothing, so it blocks.
+        if not named:
+            return [_finding(category, tool, FAIL, f"{tool} failed (exit {code}) without naming a file", output)]
     return [_finding(category, tool, FAIL, f"{tool} failed (exit {code})", output)]
 
 
@@ -108,8 +113,29 @@ def _finding(category: str, tool: str, severity: str, message: str, output: str)
                    message=message, detail=proc.tail(output))
 
 
-def _mentions(output: str, files: tuple[str, ...]) -> bool:
-    return any(f in output for f in files)
+_PATH_TOKEN = re.compile(r"[\w@+./\\-]+")
+
+
+def _named_files(output: str, ctx: Context) -> set[str]:
+    """Repo files a tool's output refers to.
+
+    Matched as whole path tokens, never substrings, so `data.py` does not
+    count as a mention of `a.py`. A token may be absolute, or relative to a
+    subdirectory (a workspace package's own tool prints `src/app.ts`), so it
+    matches every repo file whose path ends with it. An ambiguous token then
+    names several files, which errs toward blocking.
+    """
+    by_name: dict[str, list[str]] = {}
+    for rel in ctx.repo_files:
+        by_name.setdefault(rel.rsplit("/", 1)[-1], []).append(rel)
+    root = ctx.root.as_posix() + "/"
+    named: set[str] = set()
+    for token in set(_PATH_TOKEN.findall(output)):
+        token = token.replace("\\", "/").removeprefix(root).removeprefix("./").rstrip(".")
+        for rel in by_name.get(token.rsplit("/", 1)[-1], ()):
+            if rel == token or rel.endswith("/" + token):
+                named.add(rel)
+    return named
 
 
 def _languages(ctx: Context) -> list[str]:

@@ -4,6 +4,11 @@ Why it exists: without it the tool cannot be adopted on a repo that already
 breaks its own rules. Why it stores values: a baselined function that grows
 from CCN 20 to 30 is a new problem and must fail.
 
+Why it stores a list per key: a key is a file and a function name, and names
+repeat. Every anonymous function shares one, as do same-named methods. One
+recorded value per key would let any number of new functions hide behind the
+first, so each recorded value covers exactly one finding.
+
 Only structural checks are baselinable. A failing test suite or linter is
 never something to grandfather.
 """
@@ -18,50 +23,87 @@ from .findings import FAIL, Finding
 BASELINABLE = ("complexity", "size", "boundaries")
 FILE = ".gate/baseline.json"
 
+Value = float | None
+# Per key, worst first. None is a violation with no measure (a forbidden import).
+Entries = dict[str, list[Value]]
 
-def load(root: Path) -> dict[str, float | None]:
+
+def load(root: Path) -> Entries:
     path = root / FILE
     if not path.is_file():
         return {}
-    return json.loads(path.read_text(encoding="utf-8")).get("entries", {})
+    raw = json.loads(path.read_text(encoding="utf-8")).get("entries", {})
+    # Version 1 recorded a single value per key.
+    return {key: _worst_first(v if isinstance(v, list) else [v]) for key, v in raw.items()}
 
 
-def save(root: Path, entries: dict[str, float | None]) -> None:
+def is_legacy(root: Path) -> bool:
+    """A version 1 file: one value per key, so it never said how many findings a key covered."""
+    path = root / FILE
+    return path.is_file() and json.loads(path.read_text(encoding="utf-8")).get("version", 1) < 2
+
+
+def save(root: Path, entries: Entries) -> None:
     path = root / FILE
     path.parent.mkdir(exist_ok=True)
-    body = {"version": 1, "entries": dict(sorted(entries.items()))}
+    body = {"version": 2, "entries": {k: _worst_first(v) for k, v in sorted(entries.items())}}
     path.write_text(json.dumps(body, indent=2) + "\n", encoding="utf-8")
 
 
-def apply(findings: list[Finding], entries: dict[str, float | None]) -> list[Finding]:
-    return [f.as_baselined() if _covered(f, entries) else f for f in findings]
+def size(entries: Entries) -> int:
+    return sum(len(values) for values in entries.values())
 
 
-def _covered(f: Finding, entries: dict[str, float | None]) -> bool:
-    if f.severity != FAIL or f.check not in BASELINABLE or f.key not in entries:
-        return False
-    recorded = entries[f.key]
-    return recorded is None or f.value is None or f.value <= recorded
+def apply(findings: list[Finding], entries: Entries) -> list[Finding]:
+    """Mark the findings the baseline covers, pairing each recorded value with one finding, worst with worst."""
+    covered: set[int] = set()
+    for key, group in _eligible_by_key(findings).items():
+        group.sort(key=lambda pair: _rank(pair[1].value))
+        for (index, finding), recorded in zip(group, entries.get(key, [])):
+            if _within(finding.value, recorded):
+                covered.add(index)
+    return [f.as_baselined() if i in covered else f for i, f in enumerate(findings)]
 
 
-def current(findings: list[Finding]) -> dict[str, float | None]:
+def current(findings: list[Finding]) -> Entries:
     """What the baseline would be if every present failure were accepted."""
-    out: dict[str, float | None] = {}
-    for f in findings:
-        if f.severity != FAIL or f.check not in BASELINABLE:
-            continue
-        # Same-named functions share a key; keep the worst so neither regresses silently.
-        prior = out.get(f.key)
-        out[f.key] = f.value if prior is None else max(prior, f.value or prior)
-    return out
+    return {key: _worst_first([f.value for _i, f in group]) for key, group in _eligible_by_key(findings).items()}
 
 
-def pruned(entries: dict[str, float | None], now: dict[str, float | None]) -> dict[str, float | None]:
-    """Shrink only: drop fixed entries and ratchet improved values down. Never adds."""
-    out: dict[str, float | None] = {}
+def pruned(entries: Entries, now: Entries) -> Entries:
+    """Shrink only: drop entries for fixed violations and ratchet improved values down. Never adds."""
+    out: Entries = {}
     for key, recorded in entries.items():
-        if key not in now:
-            continue
-        value = now[key]
-        out[key] = recorded if recorded is None or value is None else min(recorded, value)
+        kept = [_tighter(r, n) for r, n in zip(recorded, now.get(key, []))]
+        if kept:
+            out[key] = kept
     return out
+
+
+def tightened(before: Entries, after: Entries) -> int:
+    """How many recorded values `after` holds at a lower figure than `before`."""
+    return sum(1 for key, values in after.items() for old, new in zip(before[key], values) if old != new)
+
+
+def _eligible_by_key(findings: list[Finding]) -> dict[str, list[tuple[int, Finding]]]:
+    groups: dict[str, list[tuple[int, Finding]]] = {}
+    for index, f in enumerate(findings):
+        if f.severity == FAIL and f.check in BASELINABLE:
+            groups.setdefault(f.key, []).append((index, f))
+    return groups
+
+
+def _rank(value: Value) -> float:
+    return float("-inf") if value is None else -value
+
+
+def _worst_first(values: list[Value]) -> list[Value]:
+    return sorted(values, key=_rank)
+
+
+def _within(value: Value, recorded: Value) -> bool:
+    return recorded is None or value is None or value <= recorded
+
+
+def _tighter(recorded: Value, now: Value) -> Value:
+    return recorded if recorded is None or now is None else min(recorded, now)
