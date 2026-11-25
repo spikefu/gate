@@ -135,9 +135,10 @@ def _fields(cls, table: dict, section: str):
 
 
 def _command(name: str, table: dict) -> Command:
-    if not isinstance(table, dict) or not table.get("run", table.get("command")):
+    run = table.get("run", table.get("command")) if isinstance(table, dict) else None
+    if not run:
         raise ConfigError(f"check '{name}' needs a command")
-    return Command(name=name, run=table.get("run", table.get("command")),
+    return Command(name=name, run=str(run),
                    timeout=int(table.get("timeout_seconds", 300)))
 
 

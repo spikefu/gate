@@ -88,7 +88,7 @@ def test_reports_overdue_upkeep_and_goes_quiet_once_done(repo):
 
 def test_reports_ci_that_exists_but_does_not_run_gate(repo):
     repo.write(".github/workflows/ci.yml", "steps:\n  - run: npm test\n")
-    assert messages(found(repo), "ci") == ["This repo has CI workflows, but none runs `gate check`."]
+    assert messages(found(repo), "ci") == ["This repo has CI configuration, but none of it runs `gate check`."]
     repo.write(".github/workflows/gate.yml", "steps:\n  - run: gate check --profile full --strict\n")
     assert "ci" not in areas(found(repo))
 
@@ -99,3 +99,10 @@ def test_output_says_what_gate_cannot_see_and_json_round_trips(repo):
     assert "gate cannot see:" in gaps.to_text(result)
     assert "not the same as none" in gaps.to_text([])
     assert [g["area"] for g in json.loads(gaps.to_json(result))["gaps"]] == [g.area for g in result]
+
+
+def test_reports_a_repo_with_no_ci_at_all(repo):
+    (message,) = messages(found(repo), "ci")
+    assert "No CI configuration was found" in message
+    repo.write(".gitlab-ci.yml", "test:\n  script: gate check --profile full --strict\n")
+    assert "ci" not in areas(found(repo))

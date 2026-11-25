@@ -1,0 +1,19 @@
+# gate checks itself with the same three commands it asks adopters to run.
+name: gate
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - run: pip install -e ".[dev]"
+      - run: gate check --profile full --strict
+      - run: gate baseline --check
+      - run: gate rules --check

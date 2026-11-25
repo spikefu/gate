@@ -78,3 +78,25 @@ def test_scoped_run_only_reports_selected_sources(repo):
 def test_strip_jsonc_keeps_comment_openers_inside_strings():
     text = '{ "a": "@/*", /* gone */ "b": "http://x", // gone\n "c": [1, 2,], }'
     assert json.loads(strip_jsonc(text)) == {"a": "@/*", "b": "http://x", "c": [1, 2]}
+
+
+def test_a_rule_for_one_folder_does_not_reach_a_sibling_whose_name_starts_the_same(repo):
+    repo.write("gate.toml", '[boundaries]\nforbid = ["src/app !-> src/db"]\n')
+    repo.write("src/db/index.ts", "export const db = 1\n")
+    repo.write("src/dbx/index.ts", "export const other = 1\n")
+    repo.write("src/app/ok.ts", 'import { other } from "../dbx"\n')
+    repo.write("src/application/ok.ts", 'import { db } from "../db"\n')
+    assert violations(repo) == set()
+    repo.write("src/app/bad.ts", 'import { db } from "../db"\n')
+    assert {p for p, _ in violations(repo)} == {"src/app/bad.ts"}
+
+
+def test_python_plain_import_statements_are_followed(repo):
+    repo.write("gate.toml", '[boundaries]\nforbid = ["src/app/domain !-> src/app/infra"]\n')
+    repo.write("src/app/__init__.py", "")
+    repo.write("src/app/infra/__init__.py", "")
+    repo.write("src/app/infra/db.py", "x = 1\n")
+    repo.write("src/app/domain/a.py", "import app.infra.db\n")
+    repo.write("src/app/domain/b.py", "import json, app.infra.db\n")
+    repo.write("src/app/domain/c.py", "import json\n")
+    assert {p for p, _ in violations(repo)} == {"src/app/domain/a.py", "src/app/domain/b.py"}

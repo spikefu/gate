@@ -88,3 +88,23 @@ def test_size_ignores_non_code_and_honours_overrides(repo):
     repo.write("pkg/big_test.py", "x = 1\n" * 800)
     repo.write("pkg/big.py", "x = 1\n" * 800)
     assert [f.path for f in size.run(repo.context())] == ["pkg/big.py"]
+
+
+def test_ccn_exactly_at_the_fail_limit_does_not_fail(repo):
+    repo.write("a.py", branchy("at", 14) + branchy("over", 15))
+    found = {f.symbol: f for f in complexity.run(repo.context())}
+    assert (found["at"].value, found["at"].severity) == (15, "warn")
+    assert (found["over"].value, found["over"].severity) == (16, "fail")
+
+
+def test_ccn_exactly_at_the_warn_limit_is_silent(repo):
+    repo.write("a.py", branchy("at", 9) + branchy("over", 10))
+    assert [f.symbol for f in complexity.run(repo.context())] == ["over"]
+
+
+def test_file_exactly_at_a_size_limit_is_not_over_it(repo):
+    repo.write("gate.toml", "[size]\nmax_file_lines_warn = 5\nmax_file_lines_fail = 10\n")
+    for name, lines in (("warn_at.py", 5), ("warn_over.py", 6), ("fail_at.py", 10), ("fail_over.py", 11)):
+        repo.write(name, "x = 1\n" * lines)
+    found = {f.path: f.severity for f in size.run(repo.context())}
+    assert found == {"warn_over.py": "warn", "fail_at.py": "warn", "fail_over.py": "fail"}

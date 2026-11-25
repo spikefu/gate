@@ -16,7 +16,7 @@ POSIX = os.name == "posix"
 
 def run(command: str | list[str], cwd: Path, timeout: int) -> tuple[int | None, str]:
     """Return (exit code, combined output). Exit code None means it timed out."""
-    env = {**os.environ, "NO_COLOR": "1"}
+    env = {**os.environ, "NO_COLOR": "1", "PATH": tool_path(cwd)}
     proc = subprocess.Popen(
         command, shell=isinstance(command, str), cwd=cwd, env=env, text=True,
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=POSIX,
@@ -28,6 +28,17 @@ def run(command: str | list[str], cwd: Path, timeout: int) -> tuple[int | None, 
         _kill_tree(proc)
         out, _ = proc.communicate()
         return None, out or ""
+
+
+def tool_path(root: Path) -> str:
+    """PATH with the repo's own tool directories first.
+
+    Why: a repo's linter and test runner live in its virtualenv or
+    node_modules. Without this, a command resolves to whatever the machine
+    has globally, and the same tree passes on one machine and fails on another.
+    """
+    own = [d for d in (root / ".venv" / "bin", root / ".venv" / "Scripts", root / "node_modules" / ".bin") if d.is_dir()]
+    return os.pathsep.join([*map(str, own), os.environ.get("PATH", "")])
 
 
 def _kill_tree(proc: subprocess.Popen) -> None:

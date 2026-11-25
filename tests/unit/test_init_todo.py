@@ -3,8 +3,8 @@
 import json
 
 from gate import init, propose, todo
-from gate.config import load
 from gate.checks import boundaries
+from gate.config import load
 from gate.findings import Finding
 
 
@@ -15,15 +15,17 @@ def baselined(path, rule, value, limit, symbol=None):
 
 def test_todo_ranks_files_by_total_excess_then_path():
     found = [
-        baselined("mild.py", "ccn", 16, 15, "a"),
-        baselined("bad.py", "ccn", 45, 15, "a"),
-        baselined("bad.py", "ccn", 20, 15, "b"),
+        baselined("a_mild.py", "ccn", 16, 15, "a"),
+        baselined("z_bad.py", "ccn", 20, 15, "a"),
+        baselined("z_bad.py", "ccn", 45, 15, "b"),
         baselined("many.py", "ccn", 30, 15, "a"),
         baselined("many.py", "function-lines", 240, 120, "a"),
+        baselined("b_tied.py", "ccn", 16, 15, "a"),
     ]
     queue = todo.queue(found)
-    assert [t.path for t in queue] == ["bad.py", "many.py", "mild.py"]
-    assert [f.symbol for f in queue[0].findings] == ["a", "b"], "worst finding first within a file"
+    # Neither the files nor the findings are in alphabetical order, so only the score can produce this.
+    assert [t.path for t in queue] == ["z_bad.py", "many.py", "a_mild.py", "b_tied.py"]
+    assert [f.symbol for f in queue[0].findings] == ["b", "a"], "worst finding first within a file"
     assert queue[0].score == round((45 / 15 - 1) + (20 / 15 - 1), 2)
 
 

@@ -61,3 +61,14 @@ def test_config_error_is_reported_without_blocking(repo, request):
     repo.commit()
     code, out, err = stop(repo, request.node.name)
     assert (code, out) == (1, "") and "nonsense" in err
+
+
+def test_block_message_leaves_out_findings_the_baseline_already_covers(repo, request):
+    repo.write("gate.toml", CONFIG)
+    repo.write("a.py", branchy("legacy", 20))
+    repo.commit()
+    subprocess.run([str(GATE), "baseline", "--accept"], cwd=repo.root, check=True, capture_output=True)
+    repo.write("a.py", branchy("legacy", 20) + branchy("fresh", 22))
+    _, out, _ = stop(repo, request.node.name)
+    reason = json.loads(out)["reason"]
+    assert "fresh" in reason and "legacy" not in reason

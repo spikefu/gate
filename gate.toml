@@ -1,10 +1,21 @@
-# gate checks itself with its own defaults.
+# gate checks itself. Tools come from this repo's .venv when it has one, else PATH.
+
+[toolchain]
+lint = "ruff check ."
+typecheck = "mypy"
+
+[complexity]
+max_function_lines = 60
+
+[size]
+max_file_lines_warn = 200
+max_file_lines_fail = 300
 
 [tests.unit]
-command = ".venv/bin/pytest -q tests/unit"
+command = "pytest -q tests/unit"
 
 [tests.integration]
-command = ".venv/bin/pytest -q tests/integration"
+command = "pytest -q tests/integration"
 
 [boundaries]
 # Checks are leaves: nothing below them may depend on the runner or the CLI.
@@ -16,4 +27,4 @@ forbid = [
 
 [profiles]
 fast = ["syntax", "complexity", "size", "boundaries", "lint"]
-full = ["syntax", "complexity", "size", "boundaries", "lint", "unit", "integration"]
+full = ["syntax", "complexity", "size", "boundaries", "lint", "typecheck", "unit", "integration"]

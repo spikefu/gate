@@ -147,17 +147,27 @@ def _upkeep(ctx: Context) -> list[Gap]:
 
 
 def _ci(ctx: Context) -> list[Gap]:
-    workflows = [f for f in ctx.repo_files if f.startswith(".github/workflows/") and f.endswith((".yml", ".yaml"))]
-    if not workflows:
-        return []
-    for rel in workflows:
+    pipelines = [f for f in ctx.repo_files if _is_pipeline(f)]
+    if not pipelines:
+        # A hook only runs where it is installed, and can be skipped. CI is the copy nobody can skip.
+        return [Gap("ci", "No CI configuration was found, so nothing runs the gate on a change that skipped the local hook.",
+                    "Add a CI job running `gate check --profile full --strict`.")]
+    for rel in pipelines:
         try:
             if "gate check" in (ctx.root / rel).read_text(encoding="utf-8", errors="replace"):
                 return []
         except OSError:
             continue
-    return [Gap("ci", "This repo has CI workflows, but none runs `gate check`.",
+    return [Gap("ci", "This repo has CI configuration, but none of it runs `gate check`.",
                 "Add a step running `gate check --profile full --strict`.")]
+
+
+CI_FILES = (".gitlab-ci.yml", ".circleci/config.yml", "azure-pipelines.yml", "bitbucket-pipelines.yml", "Jenkinsfile",
+            ".buildkite/pipeline.yml", ".travis.yml")
+
+
+def _is_pipeline(rel: str) -> bool:
+    return rel in CI_FILES or (rel.startswith(".github/workflows/") and rel.endswith((".yml", ".yaml")))
 
 
 # ----------------------------------------------------------------- output

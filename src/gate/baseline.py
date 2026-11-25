@@ -59,7 +59,7 @@ def apply(findings: list[Finding], entries: Entries) -> list[Finding]:
     covered: set[int] = set()
     for key, group in _eligible_by_key(findings).items():
         group.sort(key=lambda pair: _rank(pair[1].value))
-        for (index, finding), recorded in zip(group, entries.get(key, [])):
+        for (index, finding), recorded in zip(group, entries.get(key, []), strict=False):
             if _within(finding.value, recorded):
                 covered.add(index)
     return [f.as_baselined() if i in covered else f for i, f in enumerate(findings)]
@@ -74,7 +74,7 @@ def pruned(entries: Entries, now: Entries) -> Entries:
     """Shrink only: drop entries for fixed violations and ratchet improved values down. Never adds."""
     out: Entries = {}
     for key, recorded in entries.items():
-        kept = [_tighter(r, n) for r, n in zip(recorded, now.get(key, []))]
+        kept = [_tighter(r, n) for r, n in zip(recorded, now.get(key, []), strict=False)]
         if kept:
             out[key] = kept
     return out
@@ -82,7 +82,7 @@ def pruned(entries: Entries, now: Entries) -> Entries:
 
 def tightened(before: Entries, after: Entries) -> int:
     """How many recorded values `after` holds at a lower figure than `before`."""
-    return sum(1 for key, values in after.items() for old, new in zip(before[key], values) if old != new)
+    return sum(1 for key, values in after.items() for old, new in zip(before[key], values, strict=False) if old != new)
 
 
 def _eligible_by_key(findings: list[Finding]) -> dict[str, list[tuple[int, Finding]]]:

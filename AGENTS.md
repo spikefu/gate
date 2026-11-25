@@ -7,8 +7,8 @@ Run `gate check --changed` before you finish. It must pass.
 
 ### Limits
 
-- Functions: cyclomatic complexity at most 15 (warns above 10), at most 120 lines, at most 5 parameters.
-- Files: at most 500 lines (warns above 300).
+- Functions: cyclomatic complexity at most 15 (warns above 10), at most 60 lines, at most 5 parameters.
+- Files: at most 300 lines (warns above 200).
 
 ### Boundaries
 
@@ -19,9 +19,11 @@ Run `gate check --changed` before you finish. It must pass.
 ### Checks
 
 - `gate check --profile fast` (default): syntax, complexity, size, boundaries, lint.
-- `gate check --profile full`: syntax, complexity, size, boundaries, lint, unit, integration.
-- `unit` runs `.venv/bin/pytest -q tests/unit`.
-- `integration` runs `.venv/bin/pytest -q tests/integration`.
+- `gate check --profile full`: syntax, complexity, size, boundaries, lint, typecheck, unit, integration.
+- `lint` runs `ruff check .`.
+- `typecheck` runs `mypy`.
+- `unit` runs `pytest -q tests/unit`.
+- `integration` runs `pytest -q tests/integration`.
 
 ### Existing violations
 

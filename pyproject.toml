@@ -14,7 +14,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+# Everything gate's own gate runs, so a fresh clone or CI checks the same things.
+dev = ["pytest>=8.0", "ruff>=0.12", "mypy>=1.15"]
 
 [project.scripts]
 gate = "gate.cli:main"
@@ -24,3 +25,17 @@ packages = ["src/gate"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+
+# Stated here so the result does not depend on which ruff version is installed.
+[tool.ruff]
+line-length = 140
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F", "I", "B", "UP"]
+
+[tool.mypy]
+files = ["src"]
+
+[[tool.mypy.overrides]]
+module = ["lizard"]
+ignore_missing_imports = true

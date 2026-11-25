@@ -85,6 +85,10 @@ moves. The baseline matches on it.
 | `[tests.<name>]` | The repo's own test commands, judged by exit code |
 | `[[command]]` | Any other script with an exit code: end-to-end tests, accessibility scans, migration drift |
 
+Commands run with the repo's own `.venv/bin` and `node_modules/.bin` ahead of
+`PATH`, and tool auto-detection looks there first. A repo's linter is the one
+it installed, not whichever version the machine happens to have.
+
 Boundaries follow relative imports, tsconfig `paths` aliases and workspace
 package names for JS/TS, and absolute and relative imports for Python.
 
@@ -138,7 +142,7 @@ way it meets the repo.
   that passes today
 - **blind spots**: files matched by `[files] exclude`, and size overrides
 - **upkeep**: a stale baseline, a non-empty baseline, stale rules prose
-- **ci**: workflows exist but none runs `gate check`
+- **ci**: no CI configuration at all, or CI that never runs `gate check`
 
 It ends by naming what it cannot see, so an empty report is not read as a
 clean bill of health.

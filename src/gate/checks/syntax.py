@@ -18,7 +18,7 @@ from ..findings import FAIL, WARN, Finding, Skipped
 try:
     import tree_sitter_language_pack as tslp
 except ImportError:  # the check degrades to skipped rather than breaking the run
-    tslp = None
+    tslp = None  # type: ignore[assignment]
 
 # Path detection is eager (requirements.txt is "vimdoc"), so only real
 # programming languages are judged.
@@ -68,7 +68,7 @@ def _errors(path: Path) -> tuple[str, list[tuple[int, str]]]:
     except Exception:  # an unreadable or undetectable file is not a syntax error
         return "", []
     errors = [(d.span.start_line + 1, d.message) for d in result.diagnostics
-              if "error" in str(d.severity).lower()]
+              if d.span is not None and "error" in str(d.severity).lower()]
     return lang, errors[:MAX_ERRORS]
 
 

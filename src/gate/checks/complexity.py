@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import lizard
 
@@ -24,7 +25,7 @@ def run(ctx: Context) -> list[Finding]:
     return [finding for rel, fn in functions(ctx) for finding in _judge(ctx, rel, fn)]
 
 
-def functions(ctx: Context) -> Iterator[tuple[str, object]]:
+def functions(ctx: Context) -> Iterator[tuple[str, Any]]:
     """Every function lizard can measure in the files in play, with its file."""
     for rel in ctx.files:
         if Path(rel).suffix not in EXTS:

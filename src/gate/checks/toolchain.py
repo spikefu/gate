@@ -152,8 +152,7 @@ def _first_installed(ctx: Context, category: str, lang: str) -> Tool | None:
 
 
 def _binary(ctx: Context, name: str) -> str | None:
-    local = ctx.root / "node_modules" / ".bin" / name
-    return str(local) if local.exists() else shutil.which(name)
+    return shutil.which(name, path=proc.tool_path(ctx.root))
 
 
 def _argv(ctx: Context, tool: Tool, files: list[str]) -> list[str]:

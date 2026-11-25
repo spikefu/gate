@@ -17,11 +17,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.13"
-      # spikefu/gate is private: add a GATE_READ_TOKEN secret to this repo, a
-      # fine-grained token with read access to that repository's contents.
-      - run: pip install "git+https://x-access-token:${GATE_READ_TOKEN}@github.com/spikefu/gate@main"
-        env:
-          GATE_READ_TOKEN: ${{ secrets.GATE_READ_TOKEN }}
+      - run: pip install "git+https://github.com/spikefu/gate@main"
       - run: gate check --profile full --strict
       # The baseline may only shrink, and agents must be told the current rules.
       - run: gate baseline --check

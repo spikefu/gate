@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 import subprocess
+import sys
 from pathlib import Path
 
 import pytest
@@ -43,3 +45,14 @@ def branchy(name: str, branches: int) -> str:
     """A Python function whose cyclomatic complexity is `branches` + 1."""
     body = "".join(f"    if x == {i}:\n        return {i}\n" for i in range(branches))
     return f"def {name}(x):\n{body}    return -1\n"
+
+
+def gate(repo: Repo, *args: str) -> tuple[int, str, str]:
+    """Run the real CLI in a subprocess, in the repo."""
+    proc = subprocess.run([sys.executable, "-m", "gate.cli", *args], cwd=repo.root, capture_output=True, text=True)
+    return proc.returncode, proc.stdout, proc.stderr
+
+
+def check_json(repo: Repo, *args: str) -> tuple[int, dict]:
+    code, out, _ = gate(repo, "check", "--json", *args)
+    return code, json.loads(out)

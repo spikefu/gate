@@ -12,8 +12,7 @@ See `DESIGN.md` for the reasoning and what is still to build.
 pipx install git+https://github.com/spikefu/gate
 ```
 
-The repository is private, so this needs git signed in to GitHub with access
-to it. Needs Python 3.13 or newer.
+Needs Python 3.13 or newer.
 
 To work on gate itself:
 
@@ -113,15 +112,20 @@ finding, so a new function cannot hide behind an old one with the same name.
   weaknesses in the rules and proposing changes. For other harnesses, point
   `AGENTS.md` at those files; the generated rules already carry the short
   version.
-- `adapters/github-actions/gate.yml`: a workflow to copy into a repo. Because
-  gate is private, the repo using it needs a `GATE_READ_TOKEN` secret: a
-  fine-grained token with read access to the contents of `spikefu/gate`.
+- `adapters/github-actions/gate.yml`: a workflow to copy into a repo. It
+  installs gate, then runs the full profile with `--strict`, `gate baseline
+  --check` and `gate rules --check`.
 
 ## Tests
 
 ```bash
-.venv/bin/pytest -q
+.venv/bin/gate check --profile full
 ```
+
+That runs the linter, the type checker and both test suites along with the
+structural checks, and is what CI runs. Commands in `gate.toml` find their
+tools in the repo's own `.venv` or `node_modules/.bin` before `PATH`, so no
+virtualenv needs activating.
 
 `tests/unit` covers each check and the baseline arithmetic. `tests/integration`
 drives the real CLI and the hook script against throwaway git repos.
