@@ -38,7 +38,16 @@ def collect(ctx: Context) -> dict:
               (len(imports.get(rel, [])), len(imported_by.get(rel, ()))))
         for rel in subjects
     ]
-    return {"files": files, "folders": _folders(code, imports, {PurePosixPath(rel).parent.as_posix() for rel in subjects})}
+    return {
+        "files": files,
+        "folders": _folders(code, imports, {PurePosixPath(rel).parent.as_posix() for rel in subjects}),
+        "edges": _edges(subjects, imports),
+    }
+
+
+def _edges(subjects: list[str], imports: dict[str, list[str]]) -> list[list[str]]:
+    """Each import from a reported file to another product file, as [importer, imported]: for tools that draw the structure."""
+    return [[rel, target] for rel in subjects for target in imports.get(rel, [])]
 
 
 def _coupling(ctx: Context, code: list[str]) -> tuple[dict[str, list[str]], dict[str, set[str]]]:
@@ -67,6 +76,8 @@ def _file(ctx: Context, rel: str, functions: list, packages: list[str], coupling
         "longest_function": max((fn.nloc for fn in functions), default=0),
         "imports": coupling[0],
         "imported_by": coupling[1],
+        # False where gate cannot read this language's imports: the zeros above then mean unknown, not none.
+        "imports_read": is_module,
         "packages": packages,
         # What the file offers: exported declarations in JS/TS, top-level functions and classes in Python.
         "definitions": len(dead_code.definitions(rel, text)) if is_module else 0,

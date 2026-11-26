@@ -414,7 +414,9 @@ the longest function, how many of the repo's files it imports and how many
 import it, the outside packages it uses, how many things it offers, and its
 shared mutable state. Per folder: how many folders it depends on and how many
 depend on it, their ratio as instability, whether it has an entry point, and
-how many imports go past it. Test files are left out, as subjects and as
+how many imports go past it. With `--json` it also lists every import between
+product files as an edge, for tools that draw the structure, and marks each
+file whose language it cannot read imports for, so a zero there is not read as none. Test files are left out, as subjects and as
 importers. `--changed` narrows it to a change, with dependents still counted
 from the whole repo. It judges nothing and always exits 0.
 

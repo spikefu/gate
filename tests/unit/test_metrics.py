@@ -48,6 +48,22 @@ def test_a_selection_reports_those_files_with_dependents_from_the_whole_repo(rep
     assert set(folders) == {"src/billing"}
 
 
+def test_every_import_between_product_files_is_listed_as_an_edge(repo):
+    layout(repo)
+    assert metrics.collect(repo.context())["edges"] == [
+        ["src/app/main.ts", "src/billing/index.ts"], ["src/app/main.ts", "src/billing/rates.ts"],
+        ["src/billing/charge.ts", "src/billing/rates.ts"], ["src/billing/index.ts", "src/billing/charge.ts"],
+    ]
+    assert metrics.collect(repo.context(["src/billing/rates.ts"]))["edges"] == [], "edges start at the files reported"
+
+
+def test_a_file_whose_imports_gate_cannot_read_says_so(repo):
+    repo.write("src/a.ts", "export const a = 1\n")
+    repo.write("cmd/main.go", 'package main\n\nimport "fmt"\n\nfunc main() { fmt.Println(1) }\n')
+    files, _ = collect(repo)
+    assert files["src/a.ts"]["imports_read"] is True and files["cmd/main.go"]["imports_read"] is False
+
+
 def test_python_files_report_definitions_and_globals(repo):
     repo.write("pkg/__init__.py", "")
     repo.write("pkg/core.py", "import os\nfrom pkg import helpers\n\ncount = 0\n\n\ndef a():\n    global count\n    count += 1\n\n\n"
