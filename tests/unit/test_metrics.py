@@ -104,3 +104,12 @@ def test_an_import_that_is_only_a_type_or_made_later_is_listed_as_deferred(repo)
     report = metrics.collect(repo.context())
     assert report["edges"] == [["src/a.ts", "src/b.ts"], ["src/a.ts", "src/c.ts"], ["src/b.ts", "src/c.ts"]]
     assert report["deferred_edges"] == [["src/a.ts", "src/b.ts"], ["src/b.ts", "src/c.ts"]], "a imports c for real as well as for a type"
+
+
+def test_each_function_is_listed_with_its_lines_including_one_inside_another(repo):
+    repo.write("src/make.ts", "export function make() {\n  const add = (a: number) => {\n    return a + 1\n  }\n"
+                              "  return {\n    run(x: number) {\n      if (x > 1) { return add(x) }\n      return 0\n    },\n  }\n}\n")
+    files, _ = collect(repo)
+    listed = files["src/make.ts"]["function_list"]
+    assert [(f["name"], f["line"], f["end_line"]) for f in listed] == [("make", 1, 11), ("add", 2, 4), ("run", 6, 9)]
+    assert [f["complexity"] for f in listed] == [1, 1, 2] and files["src/make.ts"]["functions"] == 3

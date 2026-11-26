@@ -83,6 +83,10 @@ def _file(ctx: Context, rel: str, functions: list, packages: list[str], coupling
         "path": rel,
         "lines": len(text.splitlines()),
         "functions": len(functions),
+        # Each function with the lines it runs from and to, nested ones included: for tools that show what is inside a file.
+        "function_list": sorted(({"name": fn.name, "line": fn.start_line, "end_line": fn.end_line,
+                                  "complexity": fn.cyclomatic_complexity} for fn in functions),
+                                key=lambda f: (f["line"], f["end_line"], f["name"])),
         "max_complexity": max((fn.cyclomatic_complexity for fn in functions), default=0),
         "longest_function": max((fn.nloc for fn in functions), default=0),
         "imports": coupling[0],
