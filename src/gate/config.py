@@ -10,7 +10,7 @@ import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from . import settings
+from . import settings, stamp
 from .settings import (
     SUPPRESSION_KINDS,
     TOOLCHAIN,
@@ -31,11 +31,11 @@ STRUCTURAL = ("syntax", "complexity", "size", "boundaries", "suppressions", "tes
 # Designed but not built yet. Accepted in config so a file written against the
 # design keeps loading; a profile that names one reports it as skipped.
 PLANNED = ("test-quality", "docs", "scope", "imports")
-# Built, but only meaningful once the repo says where its coverage report is, so not in a default profile.
-OPTIONAL = ("coverage",)
+# Built, but only meaningful once the repo says where its coverage report or its stamps are, so not in a default profile.
+OPTIONAL = ("coverage", "stamps")
 
 _TOP_LEVEL = {"version", "files", "profiles", "syntax", "complexity", "size", "boundaries",
-              "suppressions", "test-integrity", "duplication", "dead-code", "change-size", "mutable-state", "toolchain", "tests", "command", "rules", *OPTIONAL, *PLANNED}
+              "suppressions", "test-integrity", "duplication", "dead-code", "change-size", "mutable-state", "toolchain", "tests", "command", "rules", "stamp", *OPTIONAL, *PLANNED}
 
 
 @dataclass(frozen=True)
@@ -54,6 +54,8 @@ class Config:
     dead_code: DeadCode = DeadCode()
     change_size: ChangeSize = ChangeSize()
     coverage: Coverage = Coverage()
+    # Files recording what something the repo keeps was made from.
+    stamps: tuple[stamp.Rule, ...] = ()
     toolchain: dict[str, str] = field(default_factory=dict)
     tests: dict[str, Command] = field(default_factory=dict)
     commands: dict[str, Command] = field(default_factory=dict)
@@ -95,6 +97,7 @@ def load(path: Path | None) -> Config:
         dead_code=settings.read_dead_code(raw.get("dead-code", {})),
         change_size=settings.read_change_size(raw.get("change-size", {})),
         coverage=settings.read_coverage(raw.get("coverage", {})),
+        stamps=stamp.read_rules(raw.get("stamp", [])),
         toolchain=settings.read_toolchain(raw.get("toolchain", {})),
         tests=tests,
         commands=commands,

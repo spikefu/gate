@@ -12,7 +12,7 @@ from .config import Config
 
 def sections(config: Config) -> list[str]:
     """Every check's paragraph, in the order an agent should read them."""
-    writers = (_suppressions, _duplication, _dead_code, _dependencies, _change_size, _coverage, _mutable_state)
+    writers = (_suppressions, _duplication, _dead_code, _dependencies, _change_size, _coverage, _mutable_state, _stamps)
     return [line for writer in writers for line in writer(config)]
 
 
@@ -93,6 +93,21 @@ def _change_size(config: Config) -> list[str]:
         "in one uncommitted change, gate warns.",
         "- When it does, stop at the next natural point and say so in your report. Do not carry on, and do not "
         "commit on your own to reset the count.",
+    ]
+
+
+def _stamps(config: Config) -> list[str]:
+    if not config.stamps or not any("stamps" in checks for checks in config.profiles.values()):
+        return []
+    return [
+        "",
+        "### Made files",
+        "",
+        "- Some files here are made from others by a tool, and each has a stamp recording what it was made from: "
+        + ", ".join(f"`{rule.file}`" for rule in config.stamps) + ".",
+        "- When you change a file one of them was made from, the gate fails until it is made again. Run the command the "
+        "finding names, and commit the new stamp.",
+        "- Never edit a stamp by hand to make the finding go away. If you cannot run the command, say so in your report.",
     ]
 
 

@@ -99,6 +99,7 @@ agent change `gate.toml`, a limit, or the baseline by itself.
 | `new-dependencies` | a package in a manifest that nobody has approved with `gate dependencies --accept` |
 | `change-size` | nothing by default: on `--changed` it warns when a change adds over 400 lines of non-test code |
 | `coverage` | on `--changed`: the tests run under 80% of the lines the change adds. Opt-in: needs `[coverage] report` |
+| `stamps` | a file the repo keeps (an index, a checked specification) was made from files that have since changed. Opt-in: needs `[[stamp]]` entries |
 | `mutable-state` | an added module-level variable that code reassigns (top-level `let`/`var`, Python `global`) |
 | `test-integrity` | on `--changed`: the change leaves the repo with fewer tests or fewer assertions |
 | `boundaries` | `a !-> b` rules and "only X may import Y" rules, against folders or outside packages (`src/domain !-> pkg:fs`); module entry points; import cycles; Python `_private` names imported from another folder |

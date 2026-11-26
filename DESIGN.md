@@ -89,6 +89,7 @@ moves. The baseline matches on it.
 | `new-dependencies` | A package declared in a manifest that nobody has approved |
 | `change-size` | On a `--changed` run: the change adds more non-test code than a person can review well. Warns |
 | `coverage` | On a `--changed` run: the tests run too few of the lines the change adds. Needs the repo's coverage report |
+| `stamps` | A file the repo keeps was made from files that have since changed, or reports a problem. Needs `[[stamp]]` entries |
 | `mutable-state` | Module-level variables that code reassigns: top-level `let`/`var`, Python `global` |
 | `test-integrity` | On a `--changed` run: the change leaves fewer tests, or fewer assertions, than the base ref had |
 | `lint`, `typecheck`, `format`, `security`, `deps` | The repo's own command, or the first installed tool for each language present |
@@ -228,6 +229,30 @@ it in a profile after the tests that write the report.
 
 `min_percent` judges the whole-repo figure as well, on any run; it is off by
 default for the reason above.
+
+### Made files and their stamps
+
+Some files are made from others by a tool that is slow or lives elsewhere:
+an index of the code, a model checker's result, a generated client. They go
+stale silently. A stamp is a small JSON file, written when such a file is
+made and kept in the repo, that records a hash of each file it was made from:
+
+```json
+{"version": 1, "made": "specs/Session.out",
+ "inputs": {"specs/Session.tla": "<sha256>", "src/session.py": "<sha256>"},
+ "covers": ["src/session/**"], "ok": true, "remake": "make check-specs"}
+```
+
+The repo names its stamps with `[[stamp]]` entries and adds `stamps` to a
+profile. The check fails (or warns, with `severity = "warn"`) when a recorded
+file has changed or gone, when a file matching `covers` has appeared since,
+or when `ok` is false. It compares content, not file times, so it gives the
+same answer on a fresh checkout as on the machine that made the file.
+
+gate reads stamps and never writes them, and knows nothing about what made
+the file. The format belongs to no one tool. A stamp is a claim that can be
+written by hand, as a test can be deleted: where it matters, have CI make the
+file again.
 
 ### Test integrity
 
