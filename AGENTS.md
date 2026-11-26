@@ -22,10 +22,15 @@ Run `gate check --changed` before you finish. It must pass.
 - Do not switch a check off to get past it. Adding any of these fails the gate: lint ignores (`# noqa`, `eslint-disable`, and the like); type-checker ignores (`# type: ignore`, `@ts-ignore`, `as any`); skipped or expected-to-fail tests; coverage exclusions.
 - Fix the cause. If a suppression is truly the right answer, say why in your report and leave it failing: accepting it is the human's decision.
 
+### Duplication
+
+- Do not copy code. A block of 10 or more lines identical to code elsewhere in the repo fails (test files are exempt).
+- Before writing a helper, search for one that already does it. If two places need the same code, move it somewhere both can use.
+
 ### Checks
 
-- `gate check --profile fast` (default): syntax, complexity, size, boundaries, suppressions, test-integrity, lint.
-- `gate check --profile full`: syntax, complexity, size, boundaries, suppressions, test-integrity, lint, typecheck, unit, integration.
+- `gate check --profile fast` (default): syntax, complexity, size, boundaries, suppressions, test-integrity, duplication, lint.
+- `gate check --profile full`: syntax, complexity, size, boundaries, suppressions, test-integrity, duplication, lint, typecheck, unit, integration.
 - `lint` runs `ruff check .`.
 - `typecheck` runs `mypy`.
 - `unit` runs `pytest -q tests/unit`.

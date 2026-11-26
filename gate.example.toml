@@ -11,7 +11,7 @@ exclude = ["**/node_modules/**", "**/dist/**", "**/build/**", "**/*.generated.*"
 # A profile is a named list of checks. Adapters pick one.
 
 [profiles]
-fast = ["syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "lint"]   # agent hook: seconds, changed files
+fast = ["syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "lint"]   # agent hook: seconds, changed files
 full = ["syntax", "complexity", "size", "boundaries", "suppressions", "lint",
         "typecheck", "unit", "integration", "test-quality", "docs"]    # CI and pre-merge
 default = "fast"
@@ -46,6 +46,14 @@ max_file_lines_fail = 1500
 # Markers that switch a check off are findings: adding one fails, and the ones
 # already there go into the baseline as a count per file that may only fall.
 kinds = ["lint", "type", "test", "coverage"]   # the default: all four
+
+[duplication]             # these are the defaults
+# A block counts as a copy when this many meaningful lines, holding this many
+# tokens, are identical to code elsewhere. Layout and comments are ignored.
+min_lines = 10
+min_tokens = 100
+include_tests = false     # tests repeat their setup on purpose
+exclude = []              # globs left out, e.g. generated clients
 
 [test-integrity]
 # On a --changed run, a net loss of tests or assertions is a finding.

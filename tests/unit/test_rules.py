@@ -95,3 +95,10 @@ def test_prose_tells_agents_not_to_silence_checks_only_when_the_check_runs(repo)
     assert "### Suppressions" not in quiet
     narrowed = rules.render(config(repo, '[suppressions]\nkinds = ["lint"]\n'))
     assert "`# noqa`" in narrowed and "coverage exclusions" not in narrowed
+
+
+def test_prose_tells_agents_not_to_copy_code_with_the_configured_size(repo):
+    assert "identical to code elsewhere in the repo fails (test files are exempt)." in rules.render(config(repo, ""))
+    block = rules.render(config(repo, "[duplication]\nmin_lines = 6\ninclude_tests = true\n"))
+    assert "A block of 6 or more lines identical to code elsewhere in the repo fails." in block
+    assert "### Duplication" not in rules.render(config(repo, '[profiles]\nfast = ["syntax"]\nfull = ["syntax"]\n'))

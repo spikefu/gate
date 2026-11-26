@@ -82,6 +82,7 @@ moves. The baseline matches on it.
 | `size` | File line count, a longer limit for test files, and per-glob overrides |
 | `boundaries` | `a !-> b` forbidden imports, and "only X may import Y" rules for ports and adapters |
 | `suppressions` | Markers that switch a check off: lint and type ignores, skipped tests, coverage exclusions |
+| `duplication` | Blocks of code identical to code elsewhere in the repo, apart from layout and comments |
 | `test-integrity` | On a `--changed` run: the change leaves fewer tests, or fewer assertions, than the base ref had |
 | `lint`, `typecheck`, `format`, `security`, `deps` | The repo's own command, or the first installed tool for each language present |
 | `[tests.<name>]` | The repo's own test commands, judged by exit code |
@@ -101,6 +102,24 @@ Markers are counted only where they act. Python is tokenized, so a marker
 quoted in a string or docstring is not counted. Other languages are matched
 by line against the comment or call syntax. `[suppressions] kinds` narrows
 which of `lint`, `type`, `test` and `coverage` count.
+
+### Duplication
+
+Writing a second copy is cheaper than finding the first, and an agent that
+has not read the whole repo does it often. The check finds blocks of at least
+10 meaningful lines and 100 tokens that are identical to code elsewhere, in
+another file or the same one. Whitespace, comments, imports and bracket-only
+lines are ignored, so reformatting a copy does not hide it.
+
+Only exact copies are found; renaming a variable hides one. That is the price
+of the false-positive principle: matching "similar" code flags code that
+merely has the same shape. The thresholds follow the conservative end of
+common practice for the same reason.
+
+A file being judged is compared with every code file in the repo, so new code
+copying old code is caught on a `--changed` run. Each file gets one finding
+carrying its number of copied lines, so the baseline is a ratchet. Test files
+are exempt by default, since tests repeat setup so each reads on its own.
 
 ### Test integrity
 
@@ -164,7 +183,8 @@ worst first, and is meant to be committed.
   first. Findings under one key are paired with its recorded values worst with
   worst, and any left over fail.
 
-- Only `complexity`, `size`, `boundaries` and `suppressions` can be baselined. A failing test
+- Only `complexity`, `size`, `boundaries`, `suppressions` and `duplication`
+  can be baselined. A failing test
   suite or linter is never grandfathered.
 - A baselined finding whose value gets worse fails again, and its message
   says what the baseline allows.

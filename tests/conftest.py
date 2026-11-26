@@ -47,7 +47,8 @@ def repo(tmp_path: Path) -> Repo:
 
 def branchy(name: str, branches: int) -> str:
     """A Python function whose cyclomatic complexity is `branches` + 1."""
-    body = "".join(f"    if x == {i}:\n        return {i}\n" for i in range(branches))
+    # The name goes into each branch so two of these are never copies of each other.
+    body = "".join(f"    if x == {i}:\n        return '{name}{i}'\n" for i in range(branches))
     return f"def {name}(x):\n{body}    return -1\n"
 
 

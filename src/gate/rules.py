@@ -41,6 +41,7 @@ def render(config: Config) -> str:
         *_limits(config),
         *_boundaries(config),
         *_suppressions(config),
+        *_duplication(config),
         "",
         "### Checks",
         "",
@@ -134,6 +135,21 @@ def _suppressions(config: Config) -> list[str]:
         + "; ".join(_MARKERS[kind] for kind in config.suppressions) + ".",
         "- Fix the cause. If a suppression is truly the right answer, say why in your report and leave it "
         "failing: accepting it is the human's decision.",
+    ]
+
+
+def _duplication(config: Config) -> list[str]:
+    if not any("duplication" in checks for checks in config.profiles.values()):
+        return []
+    d = config.duplication
+    return [
+        "",
+        "### Duplication",
+        "",
+        f"- Do not copy code. A block of {d.min_lines} or more lines identical to code elsewhere in the repo fails"
+        + ("" if d.include_tests else " (test files are exempt)") + ".",
+        "- Before writing a helper, search for one that already does it. If two places need the same code, "
+        "move it somewhere both can use.",
     ]
 
 

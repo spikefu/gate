@@ -12,7 +12,7 @@ from pathlib import Path
 
 from .files import matches
 
-STRUCTURAL = ("syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity")
+STRUCTURAL = ("syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication")
 SUPPRESSION_KINDS = ("lint", "type", "test", "coverage")
 TOOLCHAIN = ("lint", "typecheck", "format", "security", "deps")
 # Designed but not built yet. Accepted in config so a file written against the
@@ -20,7 +20,7 @@ TOOLCHAIN = ("lint", "typecheck", "format", "security", "deps")
 PLANNED = ("test-quality", "coverage", "docs", "scope", "imports")
 
 _TOP_LEVEL = {"version", "files", "profiles", "syntax", "complexity", "size", "boundaries",
-              "suppressions", "test-integrity", "toolchain", "tests", "command", "rules", *PLANNED}
+              "suppressions", "test-integrity", "duplication", "toolchain", "tests", "command", "rules", *PLANNED}
 
 
 class ConfigError(Exception):
@@ -67,6 +67,16 @@ class Size:
 
 
 @dataclass(frozen=True)
+class Duplication:
+    # A block counts as a copy when it has at least this many meaningful lines and tokens.
+    min_lines: int = 10
+    min_tokens: int = 100
+    # Tests repeat their setup on purpose, so that each one reads on its own.
+    include_tests: bool = False
+    exclude: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class OnlyRule:
     target: str
     allowed_from: tuple[str, ...]
@@ -101,6 +111,7 @@ class Config:
     # Which kinds of suppression marker count as findings.
     suppressions: tuple[str, ...] = SUPPRESSION_KINDS
     test_integrity_severity: str = "fail"
+    duplication: Duplication = Duplication()
     toolchain: dict[str, str] = field(default_factory=dict)
     tests: dict[str, Command] = field(default_factory=dict)
     commands: dict[str, Command] = field(default_factory=dict)
@@ -138,6 +149,7 @@ def load(path: Path | None) -> Config:
         boundaries=_boundaries(raw.get("boundaries", {})),
         suppressions=_suppressions(raw.get("suppressions", {})),
         test_integrity_severity=_severity(raw.get("test-integrity", {}), "test-integrity"),
+        duplication=_duplication(raw.get("duplication", {})),
         toolchain=_toolchain(raw.get("toolchain", {})),
         tests=tests,
         commands=commands,
@@ -213,6 +225,13 @@ def _suppressions(table: dict) -> tuple[str, ...]:
         raise ConfigError(f"[suppressions]: unknown key or kind {', '.join(sorted(unknown))}; "
                           f"kinds are {', '.join(SUPPRESSION_KINDS)}")
     return tuple(kinds)
+
+
+def _duplication(table: dict) -> Duplication:
+    cfg = _fields(Duplication, {**table, "exclude": tuple(table.get("exclude", ()))}, "duplication")
+    if cfg.min_lines < 2:
+        raise ConfigError("[duplication]: min_lines must be at least 2")
+    return cfg
 
 
 def _severity(table: dict, section: str) -> str:
