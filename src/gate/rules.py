@@ -106,9 +106,12 @@ def _limits(config: Config) -> list[str]:
 
 def _boundaries(config: Config) -> list[str]:
     b = config.boundaries
-    if not b.forbid and not b.only:
+    if not b.forbid and not b.only and not b.cycles:
         return []
     out = ["", "### Boundaries", ""]
+    if b.cycles:
+        out.append("- Modules must not import each other in a loop. Type-only imports, and imports inside a function, "
+                   "do not count.")
     out += [f"- `{left}` must not import `{right}`." for left, right in b.forbid]
     for rule in b.only:
         allowed = ", ".join(f"`{a}`" for a in rule.allowed_from)

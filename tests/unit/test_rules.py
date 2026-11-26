@@ -30,7 +30,8 @@ def test_prose_states_both_kinds_of_boundary_and_omits_the_heading_when_there_ar
                                       'applies_to = ["src"]\nwhy = "Ports and adapters."\n'))
     assert "- `src/domain` must not import `src/infra`." in block
     assert "- Only `src/modules` may import `src/db` (applies to code under `src`). Ports and adapters." in block
-    assert "### Boundaries" not in rules.render(config(repo))
+    assert "Modules must not import each other in a loop." in rules.render(config(repo)), "cycles need no configuration"
+    assert "### Boundaries" not in rules.render(config(repo, "[boundaries]\ncycles = false\n"))
 
 
 def test_prose_names_profiles_and_the_commands_behind_checks(repo):

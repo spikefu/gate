@@ -106,6 +106,8 @@ class OnlyRule:
 class Boundaries:
     forbid: tuple[tuple[str, str], ...] = ()
     only: tuple[OnlyRule, ...] = ()
+    # Modules importing each other in a loop are findings.
+    cycles: bool = True
 
 
 @dataclass(frozen=True)
@@ -235,7 +237,10 @@ def _boundaries(table: dict) -> Boundaries:
             raise ConfigError("[[boundaries.only]] needs 'target' and 'allowed_from'")
         only.append(OnlyRule(o["target"], tuple(o["allowed_from"]), o.get("why", ""),
                              tuple(o.get("applies_to", ()))))
-    return Boundaries(tuple(forbid), tuple(only))
+    unknown = set(table) - {"forbid", "only", "cycles"}
+    if unknown or not isinstance(table.get("cycles", True), bool):
+        raise ConfigError(f"[boundaries]: keys are forbid, only and cycles (true or false); got {', '.join(sorted(table))}")
+    return Boundaries(tuple(forbid), tuple(only), table.get("cycles", True))
 
 
 def _suppressions(table: dict) -> tuple[str, ...]:

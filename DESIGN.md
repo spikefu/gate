@@ -81,7 +81,7 @@ moves. The baseline matches on it.
 | `syntax` | Parse errors. Blocks when a native parser agrees (Python, TOML) or the language is listed in `[syntax] fail_on`; otherwise warns, because tree-sitter grammars can lag the language they parse |
 | `complexity` | Cyclomatic complexity (warn and fail limits), function length, parameter count, with per-glob overrides |
 | `size` | File line count, a longer limit for test files, and per-glob overrides |
-| `boundaries` | `a !-> b` forbidden imports, and "only X may import Y" rules for ports and adapters |
+| `boundaries` | `a !-> b` forbidden imports, "only X may import Y" rules for ports and adapters, and import cycles |
 | `suppressions` | Markers that switch a check off: lint and type ignores, skipped tests, coverage exclusions |
 | `duplication` | Blocks of code identical to code elsewhere in the repo, apart from layout and comments |
 | `dead-code` | Top-level definitions whose name appears nowhere else in the repo |
@@ -91,6 +91,21 @@ moves. The baseline matches on it.
 | `lint`, `typecheck`, `format`, `security`, `deps` | The repo's own command, or the first installed tool for each language present |
 | `[tests.<name>]` | The repo's own test commands, judged by exit code |
 | `[[command]]` | Any other script with an exit code: end-to-end tests, accessibility scans, migration drift |
+
+### Import cycles
+
+Modules that import each other in a loop cannot be understood, tested or
+moved one at a time, and which loads first decides whether a name exists yet.
+The boundaries check reports each group of modules that can all reach each
+other through imports, with the shortest loop spelled out. It needs no
+configuration; `[boundaries] cycles = false` switches it off.
+
+An import only counts if it runs while the importing module loads. Type-only
+imports, dynamic `import()`, and Python imports inside a function or an
+`if TYPE_CHECKING:` block do not, since those are the usual, legitimate ways
+to break a cycle. A Python module importing its own package is not counted
+either. Each group is one finding carrying its size, keyed by its first
+member, so a baselined tangle may shrink but not grow.
 
 ### Suppressions
 

@@ -13,6 +13,7 @@ Run `gate check --changed` before you finish. It must pass.
 
 ### Boundaries
 
+- Modules must not import each other in a loop. Type-only imports, and imports inside a function, do not count.
 - `src/gate/checks` must not import `src/gate/runner.py`.
 - `src/gate/checks` must not import `src/gate/cli.py`.
 - `src/gate/lang` must not import `src/gate/checks`.

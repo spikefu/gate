@@ -72,6 +72,8 @@ severity = "warn"         # the remedy is a person's call, so it does not block
 severity = "fail"         # the default; "warn" if CI compares against a long-lived branch
 
 [boundaries]
+cycles = true             # the default: modules importing each other in a loop are findings
+
 # Forbidden direction: the left side may not import the right side.
 forbid = [
   "packages/shared !-> apps",

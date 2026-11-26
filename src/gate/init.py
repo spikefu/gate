@@ -162,8 +162,12 @@ def render(p: Plan) -> str:
                 "# baselining it. If it mixes in logic, leave it to fail.",
                 *(line for path, limit in p.declarative for line in
                   ("# [[size.override]]", f"# glob = {q(path)}", f"# max_file_lines_fail = {limit}"))]
+    if not p.boundaries:
+        out += ["", "# Modules importing each other in a loop are findings. To switch that off:",
+                "# [boundaries]", "# cycles = false"]
     if p.boundaries:
         out += ["", "[boundaries]",
+                "# Modules importing each other in a loop are findings; `cycles = false` switches that off.",
                 "# Proposed from today's imports: every rule below already holds.",
                 "# Delete the ones that are coincidence rather than intent.",
                 "forbid = [", *(f"  {q(rule)}," for rule in p.boundaries), "]"]

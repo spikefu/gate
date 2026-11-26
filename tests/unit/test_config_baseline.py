@@ -42,6 +42,8 @@ def test_missing_config_gives_the_documented_defaults(tmp_path):
     ('[dead-code]\nignored = ["x"]\n', "ignored"),
     ("[change-size]\nmax_lines = 0\n", "change-size"),
     ("[change-size]\nlimit = 5\n", "limit"),
+    ("[boundaries]\ncycle = false\n", "cycles"),
+    ('[boundaries]\ncycles = "no"\n', "cycles"),
 ])
 def test_typos_are_errors_not_silently_ignored(tmp_path, text, fragment):
     with pytest.raises(ConfigError, match=fragment):

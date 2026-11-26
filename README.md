@@ -99,7 +99,7 @@ agent change `gate.toml`, a limit, or the baseline by itself.
 | `new-dependencies` | a package in a manifest that nobody has approved with `gate dependencies --accept` |
 | `change-size` | nothing by default: on `--changed` it warns when a change adds over 400 lines of non-test code |
 | `test-integrity` | on `--changed`: the change leaves the repo with fewer tests or fewer assertions |
-| `boundaries` | `a !-> b` rules and "only X may import Y" rules, through relative imports, tsconfig aliases and workspace packages |
+| `boundaries` | `a !-> b` rules, "only X may import Y" rules, and import cycles, through relative imports, tsconfig aliases and workspace packages |
 | `lint`, `typecheck`, `format`, `security`, `deps` | your command, or the first installed tool for the language |
 | `[tests.<name>]`, `[[command]]` | exit code of your own command |
 
