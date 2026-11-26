@@ -7,7 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from . import baseline, files
-from .checks import boundaries, command, complexity, size, syntax, toolchain
+from .checks import boundaries, command, complexity, size, suppressions, syntax, toolchain
 from .config import PLANNED, TOOLCHAIN, Config
 from .context import Context
 from .findings import Finding, Report, Skipped
@@ -17,6 +17,7 @@ _STRUCTURAL: dict[str, Callable[[Context], list[Finding]]] = {
     "complexity": complexity.run,
     "size": size.run,
     "boundaries": boundaries.run,
+    "suppressions": suppressions.run,
 }
 
 

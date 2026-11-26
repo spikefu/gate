@@ -11,14 +11,17 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
+from typing import Any
 
 from ..context import Context
 from ..findings import FAIL, WARN, Finding, Skipped
 
+tslp: Any
 try:
-    import tree_sitter_language_pack as tslp
+    import tree_sitter_language_pack as _pack
+    tslp = _pack
 except ImportError:  # the check degrades to skipped rather than breaking the run
-    tslp = None  # type: ignore[assignment]
+    tslp = None
 
 # Path detection is eager (requirements.txt is "vimdoc"), so only real
 # programming languages are judged.

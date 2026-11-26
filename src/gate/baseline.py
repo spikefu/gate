@@ -9,18 +9,19 @@ repeat. Every anonymous function shares one, as do same-named methods. One
 recorded value per key would let any number of new functions hide behind the
 first, so each recorded value covers exactly one finding.
 
-Only structural checks are baselinable. A failing test suite or linter is
+Only structural checks are baselinable, suppression counts among them. A failing test suite or linter is
 never something to grandfather.
 """
 
 from __future__ import annotations
 
 import json
+from dataclasses import replace
 from pathlib import Path
 
 from .findings import FAIL, Finding
 
-BASELINABLE = ("complexity", "size", "boundaries")
+BASELINABLE = ("complexity", "size", "boundaries", "suppressions")
 FILE = ".gate/baseline.json"
 
 Value = float | None
@@ -56,13 +57,16 @@ def size(entries: Entries) -> int:
 
 def apply(findings: list[Finding], entries: Entries) -> list[Finding]:
     """Mark the findings the baseline covers, pairing each recorded value with one finding, worst with worst."""
-    covered: set[int] = set()
+    out = list(findings)
     for key, group in _eligible_by_key(findings).items():
         group.sort(key=lambda pair: _rank(pair[1].value))
         for (index, finding), recorded in zip(group, entries.get(key, []), strict=False):
             if _within(finding.value, recorded):
-                covered.add(index)
-    return [f.as_baselined() if i in covered else f for i, f in enumerate(findings)]
+                out[index] = finding.as_baselined()
+            else:
+                # Say what was accepted, so the reader can tell how much is new.
+                out[index] = replace(finding, message=f"{finding.message} (the baseline allows {recorded:g})")
+    return out
 
 
 def current(findings: list[Finding]) -> Entries:

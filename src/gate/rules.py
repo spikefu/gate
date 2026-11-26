@@ -40,6 +40,7 @@ def render(config: Config) -> str:
         "",
         *_limits(config),
         *_boundaries(config),
+        *_suppressions(config),
         "",
         "### Checks",
         "",
@@ -110,6 +111,29 @@ def _boundaries(config: Config) -> list[str]:
         why = f" {rule.why.rstrip('.')}." if rule.why else ""
         out.append(f"- Only {allowed} may import `{rule.target}`{scope}.{why}")
     return out
+
+
+_MARKERS = {
+    "lint": "lint ignores (`# noqa`, `eslint-disable`, and the like)",
+    "type": "type-checker ignores (`# type: ignore`, `@ts-ignore`, `as any`)",
+    "test": "skipped or expected-to-fail tests",
+    "coverage": "coverage exclusions",
+}
+
+
+def _suppressions(config: Config) -> list[str]:
+    scheduled = any("suppressions" in checks for checks in config.profiles.values())
+    if not scheduled or not config.suppressions:
+        return []
+    return [
+        "",
+        "### Suppressions",
+        "",
+        "- Do not switch a check off to get past it. Adding any of these fails the gate: "
+        + "; ".join(_MARKERS[kind] for kind in config.suppressions) + ".",
+        "- Fix the cause. If a suppression is truly the right answer, say why in your report and leave it "
+        "failing: accepting it is the human's decision.",
+    ]
 
 
 def _checks(config: Config) -> list[str]:

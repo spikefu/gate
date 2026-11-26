@@ -22,7 +22,7 @@ def test_missing_config_gives_the_documented_defaults(tmp_path):
     assert (config.complexity.ccn_warn, config.complexity.ccn_fail) == (10, 15)
     assert (config.complexity.max_function_lines, config.complexity.max_parameters) == (80, 5)
     assert (config.size.warn, config.size.fail, config.size.test_fail) == (300, 500, 1000)
-    assert config.checks_for(None) == ("fast", ["syntax", "complexity", "size", "boundaries", "lint"])
+    assert config.checks_for(None) == ("fast", ["syntax", "complexity", "size", "boundaries", "suppressions", "lint"])
 
 
 @pytest.mark.parametrize("text, fragment", [
@@ -34,6 +34,7 @@ def test_missing_config_gives_the_documented_defaults(tmp_path):
     ("[tests.unit]\ntimeout_seconds = 5\n", "needs a command"),
     ('[[complexity.override]]\nglob = "a"\nmax_lines = 5\n', "complexity.override"),
     ('[[complexity.override]]\nmax_function_lines = 5\n', "complexity.override"),
+    ('[suppressions]\nkinds = ["lints"]\n', "lints"),
 ])
 def test_typos_are_errors_not_silently_ignored(tmp_path, text, fragment):
     with pytest.raises(ConfigError, match=fragment):
@@ -91,7 +92,8 @@ def test_current_records_every_finding_under_a_shared_key_worst_first():
 
 
 def test_violations_without_a_measure_are_counted_too():
-    edge = lambda: finding(key="boundaries:a->b", check="boundaries", value=None)  # noqa: E731
+    def edge():
+        return finding(key="boundaries:a->b", check="boundaries", value=None)
     assert baseline.current([edge(), edge()]) == {"boundaries:a->b": [None, None]}
     flags = [f.baselined for f in baseline.apply([edge(), edge(), edge()], {"boundaries:a->b": [None, None]})]
     assert flags == [True, True, False]

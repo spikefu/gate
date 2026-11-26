@@ -86,3 +86,12 @@ def test_prose_invites_the_agent_to_challenge_the_rules_and_keeps_the_decision_w
     assert "Run `gate gaps`" in block
     assert "even when nobody asked" in block
     assert "Propose; do not apply." in block
+
+
+def test_prose_tells_agents_not_to_silence_checks_only_when_the_check_runs(repo):
+    block = rules.render(config(repo, ""))
+    assert "### Suppressions" in block and "`# noqa`" in block and "skipped or expected-to-fail tests" in block
+    quiet = rules.render(config(repo, '[profiles]\nfast = ["syntax"]\nfull = ["syntax"]\n'))
+    assert "### Suppressions" not in quiet
+    narrowed = rules.render(config(repo, '[suppressions]\nkinds = ["lint"]\n'))
+    assert "`# noqa`" in narrowed and "coverage exclusions" not in narrowed

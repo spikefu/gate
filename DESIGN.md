@@ -81,9 +81,25 @@ moves. The baseline matches on it.
 | `complexity` | Cyclomatic complexity (warn and fail limits), function length, parameter count, with per-glob overrides |
 | `size` | File line count, a longer limit for test files, and per-glob overrides |
 | `boundaries` | `a !-> b` forbidden imports, and "only X may import Y" rules for ports and adapters |
+| `suppressions` | Markers that switch a check off: lint and type ignores, skipped tests, coverage exclusions |
 | `lint`, `typecheck`, `format`, `security`, `deps` | The repo's own command, or the first installed tool for each language present |
 | `[tests.<name>]` | The repo's own test commands, judged by exit code |
 | `[[command]]` | Any other script with an exit code: end-to-end tests, accessibility scans, migration drift |
+
+### Suppressions
+
+The quickest way past a failing check is to silence it, and an agent asked to
+finish will. So every marker is a finding: `# noqa`, `eslint-disable`,
+`# type: ignore`, `@ts-ignore`, `as any`, a skipped test, a coverage
+exclusion, and their equivalents in Go, Rust, Java, Kotlin, Swift, C#, PHP,
+Ruby and C. One finding per file and kind carries the count, so the baseline
+makes it a ratchet: existing markers are accepted once, the count may fall,
+and it cannot rise without a person running `--accept`.
+
+Markers are counted only where they act. Python is tokenized, so a marker
+quoted in a string or docstring is not counted. Other languages are matched
+by line against the comment or call syntax. `[suppressions] kinds` narrows
+which of `lint`, `type`, `test` and `coverage` count.
 
 ### Default limits
 
@@ -127,9 +143,10 @@ worst first, and is meant to be committed.
   first. Findings under one key are paired with its recorded values worst with
   worst, and any left over fail.
 
-- Only `complexity`, `size` and `boundaries` can be baselined. A failing test
+- Only `complexity`, `size`, `boundaries` and `suppressions` can be baselined. A failing test
   suite or linter is never grandfathered.
-- A baselined finding whose value gets worse fails again.
+- A baselined finding whose value gets worse fails again, and its message
+  says what the baseline allows.
 - `--prune` only shrinks: it drops fixed entries and tightens improved ones.
 - `--accept` is the only way entries are added. It is a human decision; no
   adapter runs it.

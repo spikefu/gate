@@ -11,8 +11,8 @@ exclude = ["**/node_modules/**", "**/dist/**", "**/build/**", "**/*.generated.*"
 # A profile is a named list of checks. Adapters pick one.
 
 [profiles]
-fast = ["syntax", "complexity", "size", "boundaries", "lint"]          # agent hook: seconds, changed files
-full = ["syntax", "complexity", "size", "boundaries", "lint",
+fast = ["syntax", "complexity", "size", "boundaries", "suppressions", "lint"]   # agent hook: seconds, changed files
+full = ["syntax", "complexity", "size", "boundaries", "suppressions", "lint",
         "typecheck", "unit", "integration", "test-quality", "docs"]    # CI and pre-merge
 default = "fast"
 
@@ -41,6 +41,11 @@ max_test_file_lines_fail = 1000   # files a test runner would recognise by name 
 [[size.override]]         # declarative files are allowed to be long
 glob = "apps/server/src/db/schema.ts"
 max_file_lines_fail = 1500
+
+[suppressions]
+# Markers that switch a check off are findings: adding one fails, and the ones
+# already there go into the baseline as a count per file that may only fall.
+kinds = ["lint", "type", "test", "coverage"]   # the default: all four
 
 [boundaries]
 # Forbidden direction: the left side may not import the right side.

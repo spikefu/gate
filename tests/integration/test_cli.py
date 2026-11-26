@@ -193,7 +193,8 @@ def test_gaps_reports_and_never_fails_or_writes(repo):
 
 def anonymous(*branch_counts):
     """A TypeScript file of anonymous functions, which all share the name `(anonymous)`."""
-    body = lambda n: "(x: number) => { " + " ".join(f"if (x === {i}) return {i};" for i in range(n)) + " return -1 },\n"  # noqa: E731
+    def body(n):
+        return "(x: number) => { " + " ".join(f"if (x === {i}) return {i};" for i in range(n)) + " return -1 },\n"
     return "export const handlers = [" + "".join(body(n) for n in branch_counts) + "]\n"
 
 
@@ -229,3 +230,22 @@ def test_old_format_baseline_stops_covering_extra_same_named_functions_and_says_
     gate(repo, "baseline", "--accept")
     assert gate(repo, "check")[0] == 0
     assert "old format" not in gate(repo, "baseline")[1]
+
+
+def test_adding_a_suppression_fails_until_a_person_accepts_it(repo):
+    repo.write("gate.toml", '[profiles]\nfast = ["suppressions"]\n')
+    repo.write("a.ts", "// @ts-ignore\nexport const a: number = f()\n")
+    assert check_json(repo)[0] == 1
+    gate(repo, "baseline", "--accept")
+    assert check_json(repo)[0] == 0
+    repo.commit()
+
+    repo.write("a.ts", "// @ts-ignore\nexport const a: number = f()\nexport const b = g() as any\n")
+    code, report = check_json(repo, "--changed")
+    (finding,) = report["findings"]
+    assert code == 1 and (finding["rule"], finding["value"]) == ("type", 2)
+    assert "the baseline allows 1" in finding["message"]
+
+    repo.write("a.ts", "export const a: number = f()\n")
+    assert check_json(repo, "--changed")[0] == 0
+    assert gate(repo, "baseline", "--check")[0] == 1, "the fix has to be recorded so it cannot be undone"

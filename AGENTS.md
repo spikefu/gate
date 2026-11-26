@@ -17,10 +17,15 @@ Run `gate check --changed` before you finish. It must pass.
 - `src/gate/checks` must not import `src/gate/cli.py`.
 - `src/gate/lang` must not import `src/gate/checks`.
 
+### Suppressions
+
+- Do not switch a check off to get past it. Adding any of these fails the gate: lint ignores (`# noqa`, `eslint-disable`, and the like); type-checker ignores (`# type: ignore`, `@ts-ignore`, `as any`); skipped or expected-to-fail tests; coverage exclusions.
+- Fix the cause. If a suppression is truly the right answer, say why in your report and leave it failing: accepting it is the human's decision.
+
 ### Checks
 
-- `gate check --profile fast` (default): syntax, complexity, size, boundaries, lint.
-- `gate check --profile full`: syntax, complexity, size, boundaries, lint, typecheck, unit, integration.
+- `gate check --profile fast` (default): syntax, complexity, size, boundaries, suppressions, lint.
+- `gate check --profile full`: syntax, complexity, size, boundaries, suppressions, lint, typecheck, unit, integration.
 - `lint` runs `ruff check .`.
 - `typecheck` runs `mypy`.
 - `unit` runs `pytest -q tests/unit`.

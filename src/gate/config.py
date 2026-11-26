@@ -12,14 +12,15 @@ from pathlib import Path
 
 from .files import matches
 
-STRUCTURAL = ("syntax", "complexity", "size", "boundaries")
+STRUCTURAL = ("syntax", "complexity", "size", "boundaries", "suppressions")
+SUPPRESSION_KINDS = ("lint", "type", "test", "coverage")
 TOOLCHAIN = ("lint", "typecheck", "format", "security", "deps")
 # Designed but not built yet. Accepted in config so a file written against the
 # design keeps loading; a profile that names one reports it as skipped.
 PLANNED = ("test-quality", "coverage", "docs", "scope", "imports")
 
 _TOP_LEVEL = {"version", "files", "profiles", "syntax", "complexity", "size", "boundaries",
-              "toolchain", "tests", "command", "rules", *PLANNED}
+              "suppressions", "toolchain", "tests", "command", "rules", *PLANNED}
 
 
 class ConfigError(Exception):
@@ -97,6 +98,8 @@ class Config:
     complexity: Complexity = Complexity()
     size: Size = Size()
     boundaries: Boundaries = Boundaries()
+    # Which kinds of suppression marker count as findings.
+    suppressions: tuple[str, ...] = SUPPRESSION_KINDS
     toolchain: dict[str, str] = field(default_factory=dict)
     tests: dict[str, Command] = field(default_factory=dict)
     commands: dict[str, Command] = field(default_factory=dict)
@@ -132,6 +135,7 @@ def load(path: Path | None) -> Config:
         complexity=_complexity(raw.get("complexity", {})),
         size=_size(raw.get("size", {})),
         boundaries=_boundaries(raw.get("boundaries", {})),
+        suppressions=_suppressions(raw.get("suppressions", {})),
         toolchain=_toolchain(raw.get("toolchain", {})),
         tests=tests,
         commands=commands,
@@ -198,6 +202,15 @@ def _boundaries(table: dict) -> Boundaries:
         only.append(OnlyRule(o["target"], tuple(o["allowed_from"]), o.get("why", ""),
                              tuple(o.get("applies_to", ()))))
     return Boundaries(tuple(forbid), tuple(only))
+
+
+def _suppressions(table: dict) -> tuple[str, ...]:
+    kinds = table.get("kinds", SUPPRESSION_KINDS)
+    unknown = [*(set(table) - {"kinds"}), *(k for k in kinds if k not in SUPPRESSION_KINDS)]
+    if unknown:
+        raise ConfigError(f"[suppressions]: unknown key or kind {', '.join(sorted(unknown))}; "
+                          f"kinds are {', '.join(SUPPRESSION_KINDS)}")
+    return tuple(kinds)
 
 
 def _toolchain(table: dict) -> dict[str, str]:
