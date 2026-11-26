@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import baseline, dependencies, files, gaps, init, rules, runner, todo
+from . import baseline, dependencies, files, gaps, init, metrics, rules, runner, todo
 from .config import load
 from .settings import ConfigError
 
@@ -70,7 +70,14 @@ def _parser() -> argparse.ArgumentParser:
                       help="approve every package declared today; a human decision, not for automation")
     deps.set_defaults(handler=_dependencies)
 
-    for p in (check, base, queue, start, prose, weak, deps):
+    facts = sub.add_parser("metrics", help="report facts about each file and folder, for judging the design")
+    facts.add_argument("--changed", action="store_true", help="only files in the git diff, plus untracked")
+    facts.add_argument("--base", default="HEAD", help="git ref --changed compares against")
+    facts.add_argument("--json", action="store_true", help="machine-readable output, with every file and folder")
+    facts.add_argument("--top", type=int, default=10, metavar="N", help="rows per list in the text output")
+    facts.set_defaults(handler=_metrics)
+
+    for p in (check, base, queue, start, prose, weak, deps, facts):
         p.add_argument("--root", default=".", help="repo root (default: current directory)")
         p.add_argument("--config", help="path to gate.toml (default: <root>/gate.toml)")
     return parser
@@ -159,6 +166,13 @@ def _dependencies(args, root: Path, config) -> int:
           f"{gone} approved but no longer declared")
     for dep in new:
         print(f"  new  {dep.name} ({dep.ecosystem})  {dep.path}" + (f":{dep.line}" if dep.line else ""))
+    return OK
+
+
+def _metrics(args, root: Path, config) -> int:
+    selected = files.changed_files(root, args.base, config.exclude) if args.changed else None
+    report = metrics.collect(runner.build_context(root, config, selected))
+    print(metrics.to_json(report) if args.json else metrics.to_text(report, args.top))
     return OK
 
 

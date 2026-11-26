@@ -34,13 +34,13 @@ _PY_GLOBAL = re.compile(r"^[ \t]+global[ \t]+(\w+(?:[ \t]*,[ \t]*\w+)*)[ \t]*(?:
 def run(ctx: Context) -> list[Finding]:
     findings = []
     for rel in ctx.files:
-        found = _variables(ctx.root / rel, rel)
+        found = variables(ctx.root / rel, rel)
         if found:
             findings.append(_finding(rel, found))
     return findings
 
 
-def _variables(path: Path, rel: str) -> list[tuple[int, str]]:
+def variables(path: Path, rel: str) -> list[tuple[int, str]]:
     """(line, name) of each module-level variable the file's code can reassign."""
     python = rel.endswith(".py")
     if not _judged(rel):

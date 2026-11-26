@@ -266,3 +266,20 @@ def test_a_change_that_deletes_a_test_fails_until_it_is_committed(repo):
     repo.commit()  # committing is the person's acceptance
     assert check_json(repo, "--changed")[0] == 0
     assert check_json(repo, "--changed", "--base", "HEAD~1")[0] == 1, "against the older ref the loss is still visible"
+
+
+def test_metrics_prints_facts_as_text_or_json_and_changes_nothing(repo):
+    repo.write("gate.toml", STRUCTURAL)
+    repo.write("src/a.py", "from src import b\n")
+    repo.write("src/b.py", "x = 1\n")
+    repo.write("src/__init__.py", "")
+    repo.commit()
+    code, out, _ = gate(repo, "metrics", "--json")
+    report = json.loads(out)
+    assert code == 0 and {f["path"] for f in report["files"]} == {"src/__init__.py", "src/a.py", "src/b.py"}
+    assert "most depended on" in gate(repo, "metrics")[1]
+    repo.write("src/c.py", "y = 2\n")
+    assert [f["path"] for f in json.loads(gate(repo, "metrics", "--json", "--changed")[1])["files"]] == ["src/c.py"]
+    (repo.root / "src/c.py").unlink()
+    status = subprocess.run(["git", "-C", str(repo.root), "status", "--porcelain"], capture_output=True, text=True)
+    assert status.stdout == ""

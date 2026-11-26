@@ -41,6 +41,7 @@ and defaults; each repo declares its own limits, boundaries and commands in
 | `gate baseline` | Report, accept (`--accept`) or shrink (`--prune`) recorded violations; `--check` fails if it is stale |
 | `gate todo` | List the baseline as a work queue, worst file first |
 | `gate gaps` | List weaknesses in the repo's rules that gate can see for itself; always exits 0 |
+| `gate metrics` | Report facts about each file and folder, for whoever is judging the design; always exits 0 |
 | `gate dependencies` | Show packages nobody has approved; `--accept` approves the current set |
 | `gate rules` | Write the rules as prose into `AGENTS.md` / `CLAUDE.md`; `--check` fails if they lag `gate.toml` |
 
@@ -401,6 +402,33 @@ rather than work around it. The `gate-review` skill covers what needs a
 reader: bugs that got through, tests that prove nothing, and whether a limit
 is producing better code or just smaller pieces.
 
+## Judging the design
+
+Some qualities cannot be checked without being wrong too often to trust:
+whether a unit has one job, whether an interface exposes the right things,
+whether an effect is surprising. gate leaves those to a reader and gives the
+reader facts.
+
+`gate metrics` reports, per file: size, function count, the most complex and
+the longest function, how many of the repo's files it imports and how many
+import it, the outside packages it uses, how many things it offers, and its
+shared mutable state. Per folder: how many folders it depends on and how many
+depend on it, their ratio as instability, whether it has an entry point, and
+how many imports go past it. Test files are left out, as subjects and as
+importers. `--changed` narrows it to a change, with dependents still counted
+from the whole repo. It judges nothing and always exits 0.
+
+The `gate-design-review` skill is the reader. It takes a change or a module,
+reads those facts and the gate's warnings, then reads the code against five
+questions (separation of responsibilities, encapsulation, decoupling, side
+effects, modularity), each with what counts as evidence and what does not. It
+reports at most five findings with the code that shows each, the smallest
+change that fixes it, and the gate rule that would keep it fixed. It never
+edits code and it does not block: what to act on is the person's decision.
+
+The split is deliberate. What a check can decide is in `gate check`, and
+blocks. What needs judgement is proposed, with evidence, and does not.
+
 ## Extending
 
 A check is a module in `src/gate/checks/` exposing `run(ctx) -> list[Finding]`
@@ -423,10 +451,11 @@ src/gate/
   todo.py           the baseline as a work queue
   rules.py          the config as prose for agent instruction files
   gaps.py           weaknesses in the rules that gate can see itself
+  metrics.py        facts per file and folder, for judging the design
   checks/           one module per check
   lang/             import graph and JS/TS module resolution
 adapters/
-  claude-code/      plugin: Stop hook, cleanup skill and review skill
+  claude-code/      plugin: Stop hook; cleanup, rules-review and design-review skills
   github-actions/   workflow template
 ```
 
@@ -436,7 +465,6 @@ adapters/
   stays inside declared files), required READMEs, imports of symbols a module
   does not export.
 - Adapters: pre-commit, and other agent harnesses.
-- Reviewer prompts that take `gate check --json` as input.
 
 A profile that names an unbuilt check reports it as skipped.
 

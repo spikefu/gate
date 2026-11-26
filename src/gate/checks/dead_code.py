@@ -64,7 +64,7 @@ def run(ctx: Context) -> list[Finding]:
 def _in_file(rel: str, text: str, uses: Counter[str], cfg: DeadCode) -> list[Finding]:
     here = Counter(_WORD.findall(text))
     findings = []
-    for kind, name, line in _definitions(rel, text):
+    for kind, name, line in definitions(rel, text):
         if name in cfg.ignore:
             continue
         if uses[name] == 1:
@@ -136,7 +136,7 @@ def _js_stars(rel: str, text: str, resolver: Resolver) -> set[str]:
     return {target for target in targets if target}
 
 
-def _definitions(rel: str, text: str) -> list[tuple[str, str, int]]:
+def definitions(rel: str, text: str) -> list[tuple[str, str, int]]:
     """(kind, name, line) of each top-level definition this check will judge."""
     if rel.endswith(".py"):
         return [(kind, name, line) for kind, name, line in _matches(_PY_DEF, text)

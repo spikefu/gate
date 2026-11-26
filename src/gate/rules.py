@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from . import rules_checks
 from .config import Config
 from .settings import Boundaries, ModuleRule, OnlyRule
 
@@ -41,13 +42,7 @@ def render(config: Config) -> str:
         "",
         *_limits(config),
         *_boundaries(config),
-        *_suppressions(config),
-        *_duplication(config),
-        *_dead_code(config),
-        *_dependencies(config),
-        *_change_size(config),
-        *_coverage(config),
-        *_mutable_state(config),
+        *rules_checks.sections(config),
         "",
         "### Checks",
         "",
@@ -81,6 +76,10 @@ _IMPROVING = [
     "- a check that was skipped, or that no profile runs",
     "",
     "Run `gate gaps` for the weaknesses gate can see for itself, then add what only a reader of the code can see.",
+    "",
+    "Passing the gate does not make a design good. `gate metrics` lists facts about each file and folder: what "
+    "depends on what, what is reached into, where state is shared. Use them to check your own change for units "
+    "with more than one job, internals used from outside, and effects a caller would not expect.",
     "",
     "Say what you found in your report, even when nobody asked, with the evidence and the exact change you propose: "
     "the `gate.toml` edit, or a script to add as a `[[command]]` check when gate has no check for it. "
@@ -147,113 +146,6 @@ def _only(rule: OnlyRule) -> str:
 def _named(target: str) -> str:
     """A boundary target in words: a path in the repo, or an outside package."""
     return f"the package `{target.removeprefix('pkg:')}`" if target.startswith("pkg:") else f"`{target}`"
-
-
-_MARKERS = {
-    "lint": "lint ignores (`# noqa`, `eslint-disable`, and the like)",
-    "type": "type-checker ignores (`# type: ignore`, `@ts-ignore`, `as any`)",
-    "test": "skipped or expected-to-fail tests",
-    "coverage": "coverage exclusions",
-}
-
-
-def _suppressions(config: Config) -> list[str]:
-    scheduled = any("suppressions" in checks for checks in config.profiles.values())
-    if not scheduled or not config.suppressions:
-        return []
-    return [
-        "",
-        "### Suppressions",
-        "",
-        "- Do not switch a check off to get past it. Adding any of these fails the gate: "
-        + "; ".join(_MARKERS[kind] for kind in config.suppressions) + ".",
-        "- Fix the cause. If a suppression is truly the right answer, say why in your report and leave it "
-        "failing: accepting it is the human's decision.",
-    ]
-
-
-def _duplication(config: Config) -> list[str]:
-    if not any("duplication" in checks for checks in config.profiles.values()):
-        return []
-    d = config.duplication
-    return [
-        "",
-        "### Duplication",
-        "",
-        f"- Do not copy code. A block of {d.min_lines} or more lines identical to code elsewhere in the repo fails"
-        + ("" if d.include_tests else " (test files are exempt)") + ".",
-        "- Before writing a helper, search for one that already does it. If two places need the same code, "
-        "move it somewhere both can use.",
-    ]
-
-
-def _dead_code(config: Config) -> list[str]:
-    if not any("dead-code" in checks for checks in config.profiles.values()):
-        return []
-    return [
-        "",
-        "### Dead code",
-        "",
-        "- Do not leave code nothing uses. A function, class, constant or type whose name appears nowhere else "
-        "in the repo fails.",
-        *(["- Export only what another file uses. An `export` on something only its own file uses fails."]
-          if config.dead_code.exports else []),
-        "- When you change approach, delete what the first attempt left behind. Do not keep it \"in case\".",
-    ]
-
-
-def _dependencies(config: Config) -> list[str]:
-    if not any("new-dependencies" in checks for checks in config.profiles.values()):
-        return []
-    return [
-        "",
-        "### Dependencies",
-        "",
-        "- Do not add a package without saying so. A dependency nobody has approved fails the gate.",
-        "- If one is needed, say why in your report, and confirm the package exists under exactly that name. "
-        "Never run `gate dependencies --accept`: approving a package is the human's decision.",
-    ]
-
-
-def _change_size(config: Config) -> list[str]:
-    if not any("change-size" in checks for checks in config.profiles.values()):
-        return []
-    return [
-        "",
-        "### Change size",
-        "",
-        f"- Keep each change small enough to review. Past {config.change_size.max_lines} added lines of non-test code "
-        "in one uncommitted change, gate warns.",
-        "- When it does, stop at the next natural point and say so in your report. Do not carry on, and do not "
-        "commit on your own to reset the count.",
-    ]
-
-
-def _coverage(config: Config) -> list[str]:
-    if not config.coverage.reports or not any("coverage" in checks for checks in config.profiles.values()):
-        return []
-    return [
-        "",
-        "### Coverage",
-        "",
-        f"- New code must be tested: the tests have to run at least {config.coverage.min_changed_percent}% of the lines "
-        "a change adds.",
-        "- Write tests that exercise the new lines. Do not add coverage exclusions, and do not delete code paths "
-        "to raise the figure.",
-    ]
-
-
-def _mutable_state(config: Config) -> list[str]:
-    if not any("mutable-state" in checks for checks in config.profiles.values()):
-        return []
-    return [
-        "",
-        "### Shared state",
-        "",
-        "- Do not add module-level variables that code reassigns: a top-level `let` or `var`, or a Python `global`. "
-        "Adding one fails.",
-        "- Pass the value in, return it, or keep it in an object with a clear owner.",
-    ]
 
 
 def _checks(config: Config) -> list[str]:

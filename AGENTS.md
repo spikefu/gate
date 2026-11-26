@@ -73,5 +73,7 @@ These rules are a draft, and you are expected to challenge them. Passing the gat
 
 Run `gate gaps` for the weaknesses gate can see for itself, then add what only a reader of the code can see.
 
+Passing the gate does not make a design good. `gate metrics` lists facts about each file and folder: what depends on what, what is reached into, where state is shared. Use them to check your own change for units with more than one job, internals used from outside, and effects a caller would not expect.
+
 Say what you found in your report, even when nobody asked, with the evidence and the exact change you propose: the `gate.toml` edit, or a script to add as a `[[command]]` check when gate has no check for it. Propose; do not apply. What the rules are is the human's decision.
 <!-- gate:rules:end -->

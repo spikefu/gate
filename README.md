@@ -124,7 +124,11 @@ finding, so a new function cannot hide behind an old one with the same name.
   pins behaviour with tests, refactors, runs `gate baseline --prune`, and
   stops for review.
   It also ships `gate-review` (`skills/gate-review/SKILL.md`), for finding
-  weaknesses in the rules and proposing changes. For other harnesses, point
+  weaknesses in the rules and proposing changes, and `gate-design-review`
+  (`skills/gate-design-review/SKILL.md`), which judges what no check can:
+  whether a change is well encapsulated, decoupled and has one job per unit.
+  It reads `gate metrics` for the facts and proposes; it never edits. For
+  other harnesses, point
   `AGENTS.md` at those files; the generated rules already carry the short
   version.
 - `adapters/github-actions/gate.yml`: a workflow to copy into a repo. It
