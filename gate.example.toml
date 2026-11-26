@@ -12,7 +12,7 @@ exclude = ["**/node_modules/**", "**/dist/**", "**/build/**", "**/*.generated.*"
 
 [profiles]
 fast = ["syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "dead-code", "new-dependencies",
-        "lint"]   # agent hook: seconds, changed files
+        "change-size", "lint"]   # agent hook: seconds, changed files
 full = ["syntax", "complexity", "size", "boundaries", "suppressions", "lint",
         "typecheck", "unit", "integration", "test-quality", "docs"]    # CI and pre-merge
 default = "fast"
@@ -61,6 +61,11 @@ exclude = []              # globs left out, e.g. generated clients
 severity = "fail"         # the default; or "warn"
 ignore = []               # names used in ways the text does not show
 exclude = []              # globs left out, e.g. a published package's public API
+
+[change-size]             # these are the defaults
+# On a --changed run: lines added to code files that are not tests.
+max_lines = 400
+severity = "warn"         # the remedy is a person's call, so it does not block
 
 [test-integrity]
 # On a --changed run, a net loss of tests or assertions is a finding.

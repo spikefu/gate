@@ -60,6 +60,28 @@ def deleted_files(root: Path, base: str, exclude: tuple[str, ...] = ()) -> list[
     return sorted(rel for rel in gone if not any(matches(rel, pat) for pat in exclude))
 
 
+def added_lines(root: Path, base: str) -> dict[str, int]:
+    """Lines added or modified per file since `base`, counting untracked files whole. Binary files count as 0."""
+    out: dict[str, int] = {}
+    try:
+        diff = subprocess.run(["git", "-C", str(root), "diff", "--numstat", "--no-renames", "--relative", "-z", base, "--", "."],
+                              capture_output=True, text=True)
+    except OSError:
+        return out
+    for record in diff.stdout.split("\0") if diff.returncode == 0 else ():
+        added, _, rest = record.partition("\t")
+        _deleted, _, rel = rest.partition("\t")
+        if rel and added.isdigit():
+            out[rel] = int(added)
+    for rel in _git(root, "ls-files", "-o", "--exclude-standard", "-z") or []:
+        try:
+            with open(root / rel, "rb") as handle:
+                out[rel] = sum(1 for _ in handle)
+        except OSError:
+            continue
+    return out
+
+
 def at_ref(root: Path, ref: str, rel: str) -> str | None:
     """A file's text as it was at `ref`, or None if it did not exist there."""
     try:

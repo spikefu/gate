@@ -44,6 +44,7 @@ def render(config: Config) -> str:
         *_duplication(config),
         *_dead_code(config),
         *_dependencies(config),
+        *_change_size(config),
         "",
         "### Checks",
         "",
@@ -178,6 +179,20 @@ def _dependencies(config: Config) -> list[str]:
         "- Do not add a package without saying so. A dependency nobody has approved fails the gate.",
         "- If one is needed, say why in your report, and confirm the package exists under exactly that name. "
         "Never run `gate dependencies --accept`: approving a package is the human's decision.",
+    ]
+
+
+def _change_size(config: Config) -> list[str]:
+    if not any("change-size" in checks for checks in config.profiles.values()):
+        return []
+    return [
+        "",
+        "### Change size",
+        "",
+        f"- Keep each change small enough to review. Past {config.change_size.max_lines} added lines of non-test code "
+        "in one uncommitted change, gate warns.",
+        "- When it does, stop at the next natural point and say so in your report. Do not carry on, and do not "
+        "commit on your own to reset the count.",
     ]
 
 

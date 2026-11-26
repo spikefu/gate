@@ -72,3 +72,19 @@ def test_block_message_leaves_out_findings_the_baseline_already_covers(repo, req
     _, out, _ = stop(repo, request.node.name)
     reason = json.loads(out)["reason"]
     assert "fresh" in reason and "legacy" not in reason
+
+
+def test_an_oversized_change_is_shown_to_the_human_without_blocking_the_agent(repo, request):
+    repo.write("gate.toml", '[change-size]\nmax_lines = 5\n[profiles]\nfast = ["complexity", "change-size"]\n')
+    repo.commit()
+    repo.write("a.py", "".join(f"x{i} = {i}\n" for i in range(9)))
+    code, out, err = stop(repo, request.node.name)
+    assert (code, out) == (1, ""), "exit 1 with no decision: shown to the human, the agent is not blocked"
+    assert "gate passed, with a note for you" in err and "adds 9 lines of non-test code" in err
+
+
+def test_other_warnings_do_not_interrupt(repo, request):
+    repo.write("gate.toml", CONFIG)
+    repo.commit()
+    repo.write("a.py", branchy("f", 11))   # complexity warning, not a failure
+    assert stop(repo, request.node.name) == (0, "", "")

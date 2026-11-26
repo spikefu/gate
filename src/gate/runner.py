@@ -9,6 +9,7 @@ from pathlib import Path
 from . import baseline, files
 from .checks import (
     boundaries,
+    change_size,
     command,
     complexity,
     dead_code,
@@ -34,6 +35,7 @@ _STRUCTURAL: dict[str, Callable[[Context], list[Finding]]] = {
     "duplication": duplication.run,
     "dead-code": dead_code.run,
     "new-dependencies": new_dependencies.run,
+    "change-size": change_size.run,
 }
 
 

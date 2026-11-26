@@ -97,6 +97,7 @@ agent change `gate.toml`, a limit, or the baseline by itself.
 | `duplication` | a block of 10 or more lines identical to code elsewhere in the repo |
 | `dead-code` | a top-level definition whose name appears nowhere else in the repo |
 | `new-dependencies` | a package in a manifest that nobody has approved with `gate dependencies --accept` |
+| `change-size` | nothing by default: on `--changed` it warns when a change adds over 400 lines of non-test code |
 | `test-integrity` | on `--changed`: the change leaves the repo with fewer tests or fewer assertions |
 | `boundaries` | `a !-> b` rules and "only X may import Y" rules, through relative imports, tsconfig aliases and workspace packages |
 | `lint`, `typecheck`, `format`, `security`, `deps` | your command, or the first installed tool for the language |
@@ -110,7 +111,9 @@ finding, so a new function cannot hide behind an old one with the same name.
 
 - `adapters/claude-code/`: a Claude Code plugin. Its Stop hook runs
   `gate check --changed --json` and sends failures back to the agent, up to
-  `GATE_HOOK_MAX_BLOCKS` times (default 3), then leaves it to you. It does
+  `GATE_HOOK_MAX_BLOCKS` times (default 3), then leaves it to you. When the
+  gate passes but a change has outgrown the review budget, it tells you
+  without blocking the agent. It does
   nothing in a repo without a `gate.toml`. Try it with
   `claude --plugin-dir /path/to/gate/adapters/claude-code`.
   The plugin also ships the `gate-cleanup` skill

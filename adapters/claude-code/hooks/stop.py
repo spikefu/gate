@@ -20,6 +20,9 @@ from pathlib import Path
 # fix (a flaky suite, a missing service) should reach the human sooner.
 MAX_BLOCKS = int(os.environ.get("GATE_HOOK_MAX_BLOCKS", "3"))
 MAX_LISTED = 30
+# Checks whose warnings are shown to the human even when the gate passes: the ones only a
+# person can act on. Other warnings stay in `gate check` output, where they do not interrupt.
+NOTIFY = set(filter(None, os.environ.get("GATE_HOOK_NOTIFY", "change-size").split(",")))
 
 
 def main() -> int:
@@ -34,7 +37,8 @@ def main() -> int:
     counter = _counter(event)
     if proc.returncode == 0:
         counter.unlink(missing_ok=True)
-        return 0
+        notices = [f["message"] for f in json.loads(proc.stdout)["findings"] if f["check"] in NOTIFY and not f["baselined"]]
+        return _note("gate passed, with a note for you:\n" + "\n".join(f"- {n}" for n in notices)) if notices else 0
     if proc.returncode != 1:
         return _note(f"gate could not run: {proc.stderr.strip() or proc.stdout.strip()}")
     blocks = _bump(counter, fresh=not event.get("stop_hook_active"))

@@ -32,10 +32,15 @@ Run `gate check --changed` before you finish. It must pass.
 - Do not leave code nothing uses. A function, class, constant or type whose name appears nowhere else in the repo fails.
 - When you change approach, delete what the first attempt left behind. Do not keep it "in case".
 
+### Change size
+
+- Keep each change small enough to review. Past 400 added lines of non-test code in one uncommitted change, gate warns.
+- When it does, stop at the next natural point and say so in your report. Do not carry on, and do not commit on your own to reset the count.
+
 ### Checks
 
-- `gate check --profile fast` (default): syntax, complexity, size, boundaries, suppressions, test-integrity, duplication, dead-code, lint.
-- `gate check --profile full`: syntax, complexity, size, boundaries, suppressions, test-integrity, duplication, dead-code, lint, typecheck, unit, integration.
+- `gate check --profile fast` (default): syntax, complexity, size, boundaries, suppressions, test-integrity, duplication, dead-code, change-size, lint.
+- `gate check --profile full`: syntax, complexity, size, boundaries, suppressions, test-integrity, duplication, dead-code, change-size, lint, typecheck, unit, integration.
 - `lint` runs `ruff check .`.
 - `typecheck` runs `mypy`.
 - `unit` runs `pytest -q tests/unit`.

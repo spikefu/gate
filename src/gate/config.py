@@ -13,7 +13,7 @@ from pathlib import Path
 from .files import matches
 
 STRUCTURAL = ("syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "dead-code",
-              "new-dependencies")
+              "new-dependencies", "change-size")
 SUPPRESSION_KINDS = ("lint", "type", "test", "coverage")
 TOOLCHAIN = ("lint", "typecheck", "format", "security", "deps")
 # Designed but not built yet. Accepted in config so a file written against the
@@ -21,7 +21,7 @@ TOOLCHAIN = ("lint", "typecheck", "format", "security", "deps")
 PLANNED = ("test-quality", "coverage", "docs", "scope", "imports")
 
 _TOP_LEVEL = {"version", "files", "profiles", "syntax", "complexity", "size", "boundaries",
-              "suppressions", "test-integrity", "duplication", "dead-code", "toolchain", "tests", "command", "rules", *PLANNED}
+              "suppressions", "test-integrity", "duplication", "dead-code", "change-size", "toolchain", "tests", "command", "rules", *PLANNED}
 
 
 class ConfigError(Exception):
@@ -86,6 +86,13 @@ class DeadCode:
 
 
 @dataclass(frozen=True)
+class ChangeSize:
+    # Added lines of non-test code in one change before it is too much to review well.
+    max_lines: int = 400
+    severity: str = "warn"
+
+
+@dataclass(frozen=True)
 class OnlyRule:
     target: str
     allowed_from: tuple[str, ...]
@@ -122,6 +129,7 @@ class Config:
     test_integrity_severity: str = "fail"
     duplication: Duplication = Duplication()
     dead_code: DeadCode = DeadCode()
+    change_size: ChangeSize = ChangeSize()
     toolchain: dict[str, str] = field(default_factory=dict)
     tests: dict[str, Command] = field(default_factory=dict)
     commands: dict[str, Command] = field(default_factory=dict)
@@ -161,6 +169,7 @@ def load(path: Path | None) -> Config:
         test_integrity_severity=_severity(raw.get("test-integrity", {}), "test-integrity"),
         duplication=_duplication(raw.get("duplication", {})),
         dead_code=_dead_code(raw.get("dead-code", {})),
+        change_size=_change_size(raw.get("change-size", {})),
         toolchain=_toolchain(raw.get("toolchain", {})),
         tests=tests,
         commands=commands,
@@ -250,6 +259,13 @@ def _dead_code(table: dict) -> DeadCode:
                              "exclude": tuple(table.get("exclude", ()))}, "dead-code")
     if cfg.severity not in ("fail", "warn"):
         raise ConfigError('[dead-code]: severity must be "fail" or "warn"')
+    return cfg
+
+
+def _change_size(table: dict) -> ChangeSize:
+    cfg = _fields(ChangeSize, table, "change-size")
+    if cfg.severity not in ("fail", "warn") or cfg.max_lines < 1:
+        raise ConfigError('[change-size]: severity must be "fail" or "warn", and max_lines at least 1')
     return cfg
 
 

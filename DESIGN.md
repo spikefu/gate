@@ -86,6 +86,7 @@ moves. The baseline matches on it.
 | `duplication` | Blocks of code identical to code elsewhere in the repo, apart from layout and comments |
 | `dead-code` | Top-level definitions whose name appears nowhere else in the repo |
 | `new-dependencies` | A package declared in a manifest that nobody has approved |
+| `change-size` | On a `--changed` run: the change adds more non-test code than a person can review well. Warns |
 | `test-integrity` | On a `--changed` run: the change leaves fewer tests, or fewer assertions, than the base ref had |
 | `lint`, `typecheck`, `format`, `security`, `deps` | The repo's own command, or the first installed tool for each language present |
 | `[tests.<name>]` | The repo's own test commands, judged by exit code |
@@ -166,6 +167,22 @@ Direct dependencies are read from `package.json`, `pyproject.toml`,
 read. Only names are tracked: a version change is not a new dependency, and a
 name approved once is approved in every manifest. It is not baselined, because
 an approved package is not a violation waiting to be cleaned up.
+
+### Change size
+
+An agent writes faster than anyone can read, and the person approving the
+result is the scarce resource. Review studies find the share of defects a
+reviewer catches falls off beyond a few hundred lines; past that a change is
+skimmed. On a `--changed` run the check adds up lines added or modified since
+the base ref in code files that are not tests, and warns past 400.
+
+Deleting code, writing tests, editing documents and regenerating a lockfile
+do not count. It warns instead of failing because the remedy (stop, have it
+reviewed, commit, carry on) is the person's, not something an agent can do by
+editing files; a blocked agent would only try to shrink the diff. Committing
+resets the count, which is why the rules tell agents not to commit on their
+own to get past it. The Claude Code Stop hook shows this warning to the
+person even though the gate passed; other warnings do not interrupt.
 
 ### Test integrity
 

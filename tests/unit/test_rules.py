@@ -107,3 +107,8 @@ def test_prose_tells_agents_not_to_copy_code_with_the_configured_size(repo):
 def test_prose_tells_agents_to_delete_what_they_abandon_only_when_the_check_runs(repo):
     assert "### Dead code" in rules.render(config(repo, ""))
     assert "### Dead code" not in rules.render(config(repo, '[profiles]\nfast = ["syntax"]\nfull = ["syntax"]\n'))
+
+
+def test_prose_states_the_change_size_budget(repo):
+    assert "Past 250 added lines of non-test code" in rules.render(config(repo, "[change-size]\nmax_lines = 250\n"))
+    assert "### Change size" not in rules.render(config(repo, '[profiles]\nfast = ["syntax"]\nfull = ["syntax"]\n'))
