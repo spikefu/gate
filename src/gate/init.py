@@ -1,21 +1,23 @@
 """Writes a starter gate.toml for a repo it has never seen.
 
 It only records what it can observe: the commands the repo already defines and
-the import directions it already respects. Limits are left at their defaults,
+the import directions it already respects. Limits are left at their defaults (exemptions are only suggested),
 and accepting the baseline stays a separate, deliberate step.
 """
 
 from __future__ import annotations
 
 import json
+import re
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from . import propose
-from .checks import toolchain
+from .checks import size, toolchain
 from .config import STRUCTURAL
 from .context import Context
+from .findings import FAIL
 
 
 @dataclass
@@ -24,6 +26,7 @@ class Plan:
     tests: dict[str, str] = field(default_factory=dict)
     commands: dict[str, str] = field(default_factory=dict)
     boundaries: list[str] = field(default_factory=list)
+    declarative: list[tuple[str, int]] = field(default_factory=list)  # (path, proposed line limit)
     fast: list[str] = field(default_factory=lambda: list(STRUCTURAL))
     full: list[str] = field(default_factory=list)
 
@@ -34,6 +37,7 @@ def plan(ctx: Context) -> Plan:
     _python(ctx.root, p)
     _other_stacks(ctx.root, p)
     p.boundaries = propose.boundary_rules(ctx.root, ctx.repo_files)
+    p.declarative = _declarative(ctx)
     # A check with no tool behind it would be skipped locally and fail under
     # --strict in CI, so it only joins a profile when something can run it.
     if "lint" in p.toolchain or toolchain.available(ctx, "lint"):
@@ -43,6 +47,18 @@ def plan(ctx: Context) -> Plan:
         p.full.append("typecheck")
     p.full += list(p.tests)
     return p
+
+
+_DECLARATIVE = re.compile(r"(^|[/._-])(schemas?|seeds?|migrations?|fixtures?)([/._-]|$)", re.IGNORECASE)
+
+
+def _declarative(ctx: Context) -> list[tuple[str, int]]:
+    """Over-limit files whose name says they hold data or definitions, with a limit that leaves room to grow."""
+    out = []
+    for finding in size.run(ctx):
+        if finding.severity == FAIL and _DECLARATIVE.search(finding.path) and finding.value:
+            out.append((finding.path, (int(finding.value) // 500 + 1) * 500))
+    return out
 
 
 def _node(root: Path, p: Plan) -> None:
@@ -100,13 +116,26 @@ def render(p: Plan) -> str:
         "# [complexity]",
         "# ccn_warn = 10",
         "# ccn_fail = 15",
-        "# max_function_lines = 120",
+        "# max_function_lines = 80",
         "# max_parameters = 5",
         "#",
         "# [size]",
         "# max_file_lines_warn = 300",
         "# max_file_lines_fail = 500",
+        "# max_test_file_lines_fail = 1000",
+        "#",
+        "# A limit can be changed for some files. A long UI component that is mostly markup:",
+        "# [[complexity.override]]",
+        '# glob = "**/*.tsx"',
+        "# max_function_lines = 150",
     ]
+    if p.declarative:
+        out += ["",
+                "# These files are over the size limit and look declarative (a schema, seed data, migrations,",
+                "# fixtures). If splitting one would be artificial, uncomment its exemption rather than",
+                "# baselining it. If it mixes in logic, leave it to fail.",
+                *(line for path, limit in p.declarative for line in
+                  ("# [[size.override]]", f"# glob = {q(path)}", f"# max_file_lines_fail = {limit}"))]
     if p.boundaries:
         out += ["", "[boundaries]",
                 "# Proposed from today's imports: every rule below already holds.",

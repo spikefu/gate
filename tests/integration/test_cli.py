@@ -109,7 +109,7 @@ def test_init_print_writes_nothing(repo):
 def test_todo_is_the_baseline_worst_first_and_shrinks_as_work_is_done(repo):
     repo.write("gate.toml", STRUCTURAL)
     repo.write("mild.py", branchy("f", 16))
-    repo.write("bad.py", branchy("g", 40))
+    repo.write("bad.py", branchy("g", 35))
     repo.write("unbaselined.py", "x = 1\n")
     gate(repo, "baseline", "--accept")
     repo.write("unbaselined.py", branchy("h", 30))

@@ -104,3 +104,14 @@ def test_rendered_config_loads_and_its_rules_hold_today(repo):
     assert config.tests["unit"].run == "npm run test --silent"
     assert len(config.boundaries.forbid) == 2
     assert boundaries.run(repo.context()) == []
+
+
+def test_init_suggests_exemptions_for_long_declarative_files_but_leaves_them_commented_out(repo):
+    repo.write("src/db/schema.ts", "export const a = 1\n" * 620)
+    repo.write("src/app.ts", "export const a = 1\n" * 620)
+    plan = init.plan(repo.context())
+    assert plan.declarative == [("src/db/schema.ts", 1000)]
+    text = init.render(plan)
+    assert '# glob = "src/db/schema.ts"\n# max_file_lines_fail = 1000' in text
+    repo.write("gate.toml", text)
+    assert load(repo.root / "gate.toml").size.overrides == (), "the exemption is the human's to switch on"

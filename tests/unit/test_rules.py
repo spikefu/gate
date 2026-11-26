@@ -13,9 +13,15 @@ def test_prose_states_the_configured_limits_not_the_defaults(repo):
     block = rules.render(config(repo, "[complexity]\nccn_fail = 8\nccn_warn = 6\nmax_parameters = 3\n"
                                       "[size]\nmax_file_lines_fail = 200\nmax_file_lines_warn = 150\n"
                                       '[[size.override]]\nglob = "**/*_test.py"\nmax_file_lines_fail = 900\n'))
-    assert "cyclomatic complexity at most 8 (warns above 6), at most 120 lines, at most 3 parameters" in block
+    assert "cyclomatic complexity at most 8 (warns above 6), at most 80 lines, at most 3 parameters" in block
     assert "Files: at most 200 lines (warns above 150)." in block
     assert "Files matching `**/*_test.py`: at most 900 lines." in block
+    assert "Test files: at most 1000 lines." in block
+
+
+def test_prose_states_limits_that_differ_for_some_files(repo):
+    block = rules.render(config(repo, '[[complexity.override]]\nglob = "**/*.tsx"\nmax_function_lines = 150\n'))
+    assert "Functions in files matching `**/*.tsx`: function lines at most 150." in block
 
 
 def test_prose_states_both_kinds_of_boundary_and_omits_the_heading_when_there_are_none(repo):

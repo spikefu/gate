@@ -108,3 +108,36 @@ def test_file_exactly_at_a_size_limit_is_not_over_it(repo):
         repo.write(name, "x = 1\n" * lines)
     found = {f.path: f.severity for f in size.run(repo.context())}
     assert found == {"warn_over.py": "warn", "fail_at.py": "warn", "fail_over.py": "fail"}
+
+
+def long_function(name, lines):
+    return f"def {name}():\n" + "".join(f"    x{i} = {i}\n" for i in range(lines - 2)) + "    return 0\n"
+
+
+def test_function_length_fails_past_80_lines_and_not_at_80(repo):
+    repo.write("a.py", long_function("at", 80) + long_function("over", 81))
+    assert [(f.symbol, f.rule, f.value) for f in complexity.run(repo.context())] == [("over", "function-lines", 81)]
+
+
+def test_a_limit_can_differ_for_files_matching_a_glob_and_the_first_match_wins(repo):
+    repo.write("gate.toml", '[[complexity.override]]\nglob = "ui/**"\nmax_function_lines = 150\n'
+                            '[[complexity.override]]\nglob = "**/*.py"\nmax_function_lines = 10\nccn_fail = 3\n')
+    repo.write("ui/view.py", long_function("markup", 100) + branchy("still_checked", 20))
+    repo.write("core/logic.py", long_function("logic", 100))
+    found = {(f.path, f.symbol, f.rule) for f in complexity.run(repo.context()) if f.severity == "fail"}
+    assert found == {("ui/view.py", "still_checked", "ccn"), ("core/logic.py", "logic", "function-lines")}
+
+
+def test_test_files_get_a_longer_limit_by_name_or_folder_and_other_files_do_not(repo):
+    repo.write("gate.toml", "[size]\nmax_file_lines_fail = 10\nmax_file_lines_warn = 5\nmax_test_file_lines_fail = 20\n")
+    for name in ("src/a.test.ts", "tests/unit/helpers.py", "pkg/test_x.py", "src/__tests__/b.ts", "src/latest.py", "src/contest/c.py"):
+        repo.write(name, "x = 1\n" * 15)
+    repo.write("tests/huge.py", "x = 1\n" * 21)
+    found = {f.path: f.severity for f in size.run(repo.context())}
+    assert found == {"src/latest.py": "fail", "src/contest/c.py": "fail", "tests/huge.py": "fail"}
+
+
+def test_an_explicit_override_beats_the_test_file_limit(repo):
+    repo.write("gate.toml", '[size]\nmax_test_file_lines_fail = 50\n[[size.override]]\nglob = "tests/**"\nmax_file_lines_fail = 10\n')
+    repo.write("tests/a.py", "x = 1\n" * 15)
+    assert [f.severity for f in size.run(repo.context())] == ["fail"]

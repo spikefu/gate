@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from ..context import Context
-from ..files import matches
+from ..files import is_test, matches
 from ..findings import FAIL, WARN, Finding
 
 
@@ -28,6 +28,8 @@ def _limits(ctx: Context, rel: str) -> tuple[int, int]:
             # warn limit above it.
             warn = o.warn if o.warn is not None else max(size.warn, fail if o.fail else 0)
             return warn, fail
+    if is_test(rel):
+        return max(size.warn, size.test_fail), size.test_fail
     return size.warn, size.fail
 
 

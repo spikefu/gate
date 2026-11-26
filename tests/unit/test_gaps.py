@@ -55,19 +55,31 @@ def test_reports_import_directions_the_code_keeps_but_no_rule_protects(repo):
     assert "boundaries" not in areas(found(repo, COVERED + '[boundaries]\nforbid = ["src/db !-> src"]\n'))
 
 
-def test_reports_limits_that_could_be_tightened_at_no_cost(repo):
-    repo.write("a.py", branchy("f", 7) + "\ndef g(a, b):\n    return a\n")
-    headroom = {g.message.split("`")[1]: g.suggestion for g in found(repo) if g.area == "headroom"}
-    assert headroom["[complexity] ccn_fail"] == "It could be lowered to 8 today without failing anything new."
-    assert "lowered to 2 " in headroom["[complexity] max_parameters"]
-    assert "[size] max_file_lines_fail" in headroom
+def test_reports_a_limit_raised_above_the_default_that_nothing_needs_any_more(repo):
+    repo.write("a.py", branchy("f", 7))
+    raised = COVERED + "[complexity]\nccn_fail = 25\n[size]\nmax_file_lines_fail = 900\n"
+    headroom = {g.message.split("`")[1]: g for g in found(repo, raised) if g.area == "headroom"}
+    assert set(headroom) == {"[complexity] ccn_fail", "[size] max_file_lines_fail"}
+    assert "raised to 25 (the default is 15)" in headroom["[complexity] ccn_fail"].message
+    assert "returning it to the default" in headroom["[complexity] ccn_fail"].suggestion
 
 
-def test_headroom_ignores_code_that_already_fails_and_is_silent_at_the_limit(repo):
-    # One function far over the limit, one exactly at it: nothing can be tightened for free.
-    repo.write("a.py", branchy("over", 40) + branchy("at_limit", 14))
-    keys = [g.message.split("`")[1] for g in found(repo) if g.area == "headroom"]
-    assert "[complexity] ccn_fail" not in keys
+def test_never_suggests_tightening_a_default_just_because_nothing_would_fail(repo):
+    # A limit is a judgement about readable code, not a record of today's maximum.
+    repo.write("a.py", branchy("f", 2))
+    assert "headroom" not in areas(found(repo))
+    assert "headroom" not in areas(found(repo, COVERED + "[complexity]\nccn_fail = 12\n"))
+
+
+def test_a_raised_limit_that_code_still_needs_is_not_reported(repo):
+    repo.write("a.py", branchy("needs_it", 19))
+    assert "headroom" not in areas(found(repo, COVERED + "[complexity]\nccn_fail = 25\n"))
+
+
+def test_reports_functions_given_looser_limits_as_a_blind_spot(repo):
+    text = COVERED + '[[complexity.override]]\nglob = "**/*.tsx"\nmax_function_lines = 150\nccn_fail = 12\n'
+    (message,) = [m for m in messages(found(repo, text), "blind spots") if "tsx" in m]
+    assert message == "Functions in files matching `**/*.tsx` are allowed max_function_lines 150."
 
 
 def test_reports_what_gate_is_told_to_skip(repo):

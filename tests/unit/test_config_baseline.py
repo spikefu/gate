@@ -20,7 +20,8 @@ def finding(key="complexity/ccn:a.py::f", value=20, check="complexity", severity
 def test_missing_config_gives_the_documented_defaults(tmp_path):
     config = load(tmp_path / "gate.toml")
     assert (config.complexity.ccn_warn, config.complexity.ccn_fail) == (10, 15)
-    assert (config.complexity.max_function_lines, config.complexity.max_parameters) == (120, 5)
+    assert (config.complexity.max_function_lines, config.complexity.max_parameters) == (80, 5)
+    assert (config.size.warn, config.size.fail, config.size.test_fail) == (300, 500, 1000)
     assert config.checks_for(None) == ("fast", ["syntax", "complexity", "size", "boundaries", "lint"])
 
 
@@ -31,6 +32,8 @@ def test_missing_config_gives_the_documented_defaults(tmp_path):
     ('[profiles]\nfast = ["sintax"]\n', "sintax"),
     ("[toolchain]\nlinter = 'x'\n", "linter"),
     ("[tests.unit]\ntimeout_seconds = 5\n", "needs a command"),
+    ('[[complexity.override]]\nglob = "a"\nmax_lines = 5\n', "complexity.override"),
+    ('[[complexity.override]]\nmax_function_lines = 5\n', "complexity.override"),
 ])
 def test_typos_are_errors_not_silently_ignored(tmp_path, text, fragment):
     with pytest.raises(ConfigError, match=fragment):

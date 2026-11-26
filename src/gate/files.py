@@ -28,6 +28,18 @@ def matches(path: str, pattern: str) -> bool:
     return path == prefix or path.startswith(prefix + "/")
 
 
+# Conventions across the common test runners. Deliberately narrow: a file is
+# only treated as a test when its name or folder says so.
+TEST_GLOBS = (
+    "**/*.test.*", "**/*.spec.*", "**/test_*.py", "**/*_test.py", "**/*_test.go", "**/*_spec.rb",
+    "**/__tests__/**", "**/tests/**", "**/test/**", "**/e2e/**",
+)
+
+
+def is_test(path: str) -> bool:
+    return any(matches(path, glob) for glob in TEST_GLOBS)
+
+
 def all_files(root: Path, exclude: tuple[str, ...] = ()) -> list[str]:
     listed = _git(root, "ls-files", "-co", "--exclude-standard", "-z")
     paths = listed if listed is not None else _walk(root)

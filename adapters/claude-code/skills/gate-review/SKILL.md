@@ -15,8 +15,9 @@ in your report, in the format below, even though nobody asked.
 ## Where to look
 
 1. **What gate can see for itself.** Run `gate gaps --json`. It lists checks
-   that never run, import directions nothing protects, limits looser than the
-   code needs, files gate is told to skip, and upkeep that is overdue.
+   that never run, import directions nothing protects, limits raised above the
+   defaults that nothing needs any more, files gate is told to skip, and
+   upkeep that is overdue.
 
 2. **What almost failed.** Run `gate check --profile full --json` and read
    the warnings and the `skipped` list. A cluster of functions just under a
@@ -65,8 +66,11 @@ read beat fifteen they will skim.
 ## Tightening and loosening
 
 Both are legitimate. A limit that only produces arbitrary splits should be
-raised. A limit nothing comes near should be lowered so it starts to mean
-something. Say which and why. What is not legitimate is loosening a rule in
+raised, or given an override for the files where the split is artificial. A
+limit should be lowered when code that passes it is still hard to follow, with
+the functions that show it. Never propose lowering one only because nothing
+would fail today: that turns a judgement into an arbitrary number. Say which
+and why. What is not legitimate is loosening a rule in
 the same change as the code it would have failed.
 
 ## Never

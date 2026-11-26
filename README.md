@@ -58,9 +58,11 @@ only shrinks.
 
 Exit codes: 0 clean, 1 findings, 2 config or usage error.
 
-With no `gate.toml`, the defaults apply: CCN warn 10 / fail 15, 120 lines and
-5 parameters per function, files warn 300 / fail 500 lines. `gate.example.toml`
-shows every option. `--root` and `--config` let you try a config against a repo
+With no `gate.toml`, the defaults apply: CCN warn 10 / fail 15, 80 lines and
+5 parameters per function, files warn 300 / fail 500 lines, test files 1000.
+Any of these can differ for some files: `[[complexity.override]]` for a
+markup-heavy component, `[[size.override]]` for a schema. `DESIGN.md` gives
+the reasoning behind each default, and `gate.example.toml` shows every option. `--root` and `--config` let you try a config against a repo
 without adding anything to it.
 
 ## The rules are meant to be challenged
@@ -88,8 +90,8 @@ agent change `gate.toml`, a limit, or the baseline by itself.
 | Check | Blocks on |
 |---|---|
 | `syntax` | parse errors a native parser confirms (Python, TOML); others warn unless listed in `[syntax] fail_on` |
-| `complexity` | cyclomatic complexity, function length, parameter count |
-| `size` | file line count, with per-glob overrides |
+| `complexity` | cyclomatic complexity, function length, parameter count, with per-glob overrides |
+| `size` | file line count, a longer limit for test files, and per-glob overrides |
 | `boundaries` | `a !-> b` rules and "only X may import Y" rules, through relative imports, tsconfig aliases and workspace packages |
 | `lint`, `typecheck`, `format`, `security`, `deps` | your command, or the first installed tool for the language |
 | `[tests.<name>]`, `[[command]]` | exit code of your own command |

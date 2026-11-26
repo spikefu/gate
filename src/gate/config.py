@@ -7,8 +7,10 @@ would leave a rule unenforced while everyone believes it is on.
 from __future__ import annotations
 
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from pathlib import Path
+
+from .files import matches
 
 STRUCTURAL = ("syntax", "complexity", "size", "boundaries")
 TOOLCHAIN = ("lint", "typecheck", "format", "security", "deps")
@@ -34,8 +36,17 @@ class Syntax:
 class Complexity:
     ccn_warn: int = 10
     ccn_fail: int = 15
-    max_function_lines: int = 120
+    max_function_lines: int = 80
     max_parameters: int = 5
+    # Per-glob exceptions, first match wins: (glob, {limit name: value}).
+    overrides: tuple[tuple[str, tuple[tuple[str, int], ...]], ...] = ()
+
+    def for_file(self, rel: str) -> Complexity:
+        """The limits that apply to one file."""
+        for glob, limits in self.overrides:
+            if matches(rel, glob):
+                return replace(self, overrides=(), **dict(limits))
+        return self
 
 
 @dataclass(frozen=True)
@@ -49,6 +60,8 @@ class SizeOverride:
 class Size:
     warn: int = 300
     fail: int = 500
+    # Test files run long for a good reason: many small cases, each spelled out.
+    test_fail: int = 1000
     overrides: tuple[SizeOverride, ...] = ()
 
 
@@ -116,7 +129,7 @@ def load(path: Path | None) -> Config:
     cfg = Config(
         exclude=tuple(raw.get("files", {}).get("exclude", ())),
         syntax=Syntax(tuple(_fields(Syntax, raw.get("syntax", {}), "syntax").fail_on)),
-        complexity=_fields(Complexity, raw.get("complexity", {}), "complexity"),
+        complexity=_complexity(raw.get("complexity", {})),
         size=_size(raw.get("size", {})),
         boundaries=_boundaries(raw.get("boundaries", {})),
         toolchain=_toolchain(raw.get("toolchain", {})),
@@ -142,15 +155,33 @@ def _command(name: str, table: dict) -> Command:
                    timeout=int(table.get("timeout_seconds", 300)))
 
 
+_LIMITS = ("ccn_warn", "ccn_fail", "max_function_lines", "max_parameters")
+
+
+def _complexity(table: dict) -> Complexity:
+    table = dict(table)
+    overrides = []
+    for o in table.pop("override", []):
+        limits = {k: v for k, v in o.items() if k != "glob"}
+        unknown = set(limits) - set(_LIMITS)
+        if "glob" not in o or not limits or unknown:
+            raise ConfigError("[[complexity.override]] needs 'glob' and at least one of: " + ", ".join(_LIMITS))
+        overrides.append((o["glob"], tuple(sorted(limits.items()))))
+    return replace(_fields(Complexity, table, "complexity"), overrides=tuple(overrides))
+
+
 def _size(table: dict) -> Size:
     overrides = tuple(
         SizeOverride(o["glob"], o.get("max_file_lines_warn"), o.get("max_file_lines_fail"))
         for o in table.get("override", [])
     )
-    unknown = set(table) - {"max_file_lines_warn", "max_file_lines_fail", "override"}
+    unknown = set(table) - {"max_file_lines_warn", "max_file_lines_fail", "max_test_file_lines_fail", "override"}
     if unknown:
         raise ConfigError(f"[size]: unknown key(s) {', '.join(sorted(unknown))}")
-    return Size(table.get("max_file_lines_warn", 300), table.get("max_file_lines_fail", 500), overrides)
+    fail = table.get("max_file_lines_fail", 500)
+    # A repo that raises the general limit above the test default means it for tests too.
+    test_fail = table.get("max_test_file_lines_fail", max(1000, fail))
+    return Size(table.get("max_file_lines_warn", 300), fail, test_fail, overrides)
 
 
 def _boundaries(table: dict) -> Boundaries:

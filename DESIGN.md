@@ -78,12 +78,30 @@ moves. The baseline matches on it.
 | Check | Rules |
 |---|---|
 | `syntax` | Parse errors. Blocks when a native parser agrees (Python, TOML) or the language is listed in `[syntax] fail_on`; otherwise warns, because tree-sitter grammars can lag the language they parse |
-| `complexity` | Cyclomatic complexity (warn and fail limits), function length, parameter count |
-| `size` | File line count, with per-glob overrides |
+| `complexity` | Cyclomatic complexity (warn and fail limits), function length, parameter count, with per-glob overrides |
+| `size` | File line count, a longer limit for test files, and per-glob overrides |
 | `boundaries` | `a !-> b` forbidden imports, and "only X may import Y" rules for ports and adapters |
 | `lint`, `typecheck`, `format`, `security`, `deps` | The repo's own command, or the first installed tool for each language present |
 | `[tests.<name>]` | The repo's own test commands, judged by exit code |
 | `[[command]]` | Any other script with an exit code: end-to-end tests, accessibility scans, migration drift |
+
+### Default limits
+
+| Limit | Default | Reasoning |
+|---|---|---|
+| Cyclomatic complexity | warn above 10, fail above 15 | 10 is McCabe's original threshold and a common linter default; 15 is the usual ceiling for code that is still testable path by path |
+| Function length | 80 lines | Roughly what fits in view with its context. Markup-heavy UI components are the usual exception: give them a `[[complexity.override]]` |
+| Parameters | 5 | Past this, callers start passing arguments in the wrong order |
+| File length | warn above 300, fail above 500 | Long enough for one cohesive module, short enough to read in a sitting and to review as a whole |
+| Test file length | 1000 | Tests are many small independent cases; length there is not tangled logic |
+
+A limit is a judgement about what stays readable, not a record of what the
+code happens to be today. So gate never suggests lowering one just because
+nothing would fail, and a file that is long because it is declarative (a
+schema, seed data) should get an override rather than an artificial split.
+
+A nesting-depth limit was tried and left out: the available measure
+miscounted often enough on real code to break the false-positive principle.
 
 Commands run with the repo's own `.venv/bin` and `node_modules/.bin` ahead of
 `PATH`, and tool auto-detection looks there first. A repo's linter is the one
@@ -138,9 +156,8 @@ way it meets the repo.
   or command that no profile runs; no tests configured at all
 - **boundaries**: import directions the code already respects that no rule
   protects (the same proposals `gate init` makes, minus those already covered)
-- **headroom**: for each limit, the tightest value that would fail nothing
-  that passes today
-- **blind spots**: files matched by `[files] exclude`, and size overrides
+- **headroom**: a limit raised above its default that nothing needs any more
+- **blind spots**: files matched by `[files] exclude`, and size or complexity overrides looser than the general limit
 - **upkeep**: a stale baseline, a non-empty baseline, stale rules prose
 - **ci**: no CI configuration at all, or CI that never runs `gate check`
 

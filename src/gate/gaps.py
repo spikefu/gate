@@ -15,7 +15,7 @@ from pathlib import Path
 
 from . import baseline, files, propose, rules
 from .checks import complexity, toolchain
-from .config import TOOLCHAIN
+from .config import TOOLCHAIN, Config
 from .context import Context
 from .files import matches
 
@@ -80,25 +80,32 @@ def _covered(rule: str, forbid: tuple[tuple[str, str], ...]) -> bool:
 # ------------------------------------------- limits looser than they need be
 
 def _headroom(ctx: Context) -> list[Gap]:
-    """For each limit, the tightest value that would fail nothing that passes today."""
-    c, s = ctx.config.complexity, ctx.config.size
+    """Limits raised above gate's defaults that nothing in the repo needs any more.
+
+    Why only those: a limit is a judgement about readable code, not a record
+    of what the code happens to be today. Lowering one to the current maximum
+    just because nothing would fail turns it into an arbitrary number that
+    forces the next honest change to be split.
+    """
+    c, s, standard = ctx.config.complexity, ctx.config.size, Config()
     worst = {"ccn": 0, "lines": 0, "params": 0}
     for _rel, fn in complexity.functions(ctx):
-        for rule, value, limit in (("ccn", fn.cyclomatic_complexity, c.ccn_fail), ("lines", fn.nloc, c.max_function_lines),
-                                   ("params", complexity.param_count(fn), c.max_parameters)):
-            if value <= limit:
-                worst[rule] = max(worst[rule], value)
-    longest = max((n for rel in ctx.code_files() if (n := _line_count(ctx.root / rel)) <= s.fail), default=0)
+        worst["ccn"] = max(worst["ccn"], fn.cyclomatic_complexity)
+        worst["lines"] = max(worst["lines"], fn.nloc)
+        worst["params"] = max(worst["params"], complexity.param_count(fn))
+    longest = max((_line_count(ctx.root / rel) for rel in ctx.code_files() if not files.is_test(rel)), default=0)
     candidates = (
-        ("[complexity] ccn_fail", worst["ccn"], c.ccn_fail, "the most complex function that passes"),
-        ("[complexity] max_function_lines", worst["lines"], c.max_function_lines, "the longest function that passes"),
-        ("[complexity] max_parameters", worst["params"], c.max_parameters, "the widest signature that passes"),
-        ("[size] max_file_lines_fail", longest, s.fail, "the longest file that passes"),
+        ("[complexity] ccn_fail", worst["ccn"], c.ccn_fail, standard.complexity.ccn_fail, "the most complex function"),
+        ("[complexity] max_function_lines", worst["lines"], c.max_function_lines,
+         standard.complexity.max_function_lines, "the longest function"),
+        ("[complexity] max_parameters", worst["params"], c.max_parameters, standard.complexity.max_parameters,
+         "the widest signature"),
+        ("[size] max_file_lines_fail", longest, s.fail, standard.size.fail, "the longest file outside tests"),
     )
     return [
-        Gap("headroom", f"`{key}` is {limit}, but {what} is at {value}.",
-            f"It could be lowered to {value} today without failing anything new.")
-        for key, value, limit, what in candidates if 0 < value < limit
+        Gap("headroom", f"`{key}` was raised to {limit} (the default is {default}), but {what} is now at {value}.",
+            "Nothing needs the looser limit any more. Consider returning it to the default.")
+        for key, value, limit, default, what in candidates if limit > default and value <= default
     ]
 
 
@@ -120,6 +127,11 @@ def _blind_spots(ctx: Context) -> list[Gap]:
         if hidden:
             out.append(Gap("blind spots", f"{hidden} file(s) match `[files] exclude` and are never checked.",
                            "Confirm each pattern still only covers generated or vendored code."))
+    for glob, limits in cfg.complexity.overrides:
+        looser = [f"{name} {value}" for name, value in limits if value > getattr(cfg.complexity, name)]
+        if looser:
+            out.append(Gap("blind spots", f"Functions in files matching `{glob}` are allowed {', '.join(looser)}.",
+                           "Confirm the exception is still needed."))
     for o in cfg.size.overrides:
         if o.fail is not None and o.fail > cfg.size.fail:
             out.append(Gap("blind spots", f"Files matching `{o.glob}` may reach {o.fail} lines instead of {cfg.size.fail}.",

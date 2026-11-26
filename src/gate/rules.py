@@ -86,9 +86,15 @@ def _limits(config: Config) -> list[str]:
         f"at most {c.max_function_lines} lines, at most {c.max_parameters} parameters.",
         f"- Files: at most {s.fail} lines (warns above {s.warn}).",
     ]
+    if s.test_fail != s.fail:
+        out.append(f"- Test files: at most {s.test_fail} lines.")
     for o in s.overrides:
         if o.fail is not None:
             out.append(f"- Files matching `{o.glob}`: at most {o.fail} lines.")
+    for glob, limits in c.overrides:
+        names = {"ccn_warn": "complexity warns above", "ccn_fail": "complexity at most",
+                 "max_function_lines": "function lines at most", "max_parameters": "parameters at most"}
+        out.append(f"- Functions in files matching `{glob}`: {', '.join(f'{names[k]} {v}' for k, v in limits)}.")
     return out
 
 

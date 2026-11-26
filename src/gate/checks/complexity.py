@@ -39,7 +39,7 @@ def functions(ctx: Context) -> Iterator[tuple[str, Any]]:
 
 
 def _judge(ctx: Context, rel: str, fn) -> list[Finding]:
-    cfg = ctx.config.complexity
+    cfg = ctx.config.complexity.for_file(rel)
     ccn, lines, params = fn.cyclomatic_complexity, fn.nloc, param_count(fn)
     out = []
     if ccn > cfg.ccn_fail:

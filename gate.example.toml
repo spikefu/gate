@@ -26,16 +26,21 @@ fail_on = []
 [complexity]              # these are the defaults
 ccn_warn = 10
 ccn_fail = 15
-max_function_lines = 120
+max_function_lines = 80
 max_parameters = 5
+
+[[complexity.override]]   # any of the four limits, for some files; first match wins
+glob = "**/*.tsx"
+max_function_lines = 150  # a component that is mostly markup
 
 [size]                    # these are the defaults
 max_file_lines_warn = 300
 max_file_lines_fail = 500
+max_test_file_lines_fail = 1000   # files a test runner would recognise by name or folder
 
-[[size.override]]         # tests and fixtures are allowed to be long
-glob = "**/*.test.ts"
-max_file_lines_fail = 1000
+[[size.override]]         # declarative files are allowed to be long
+glob = "apps/server/src/db/schema.ts"
+max_file_lines_fail = 1500
 
 [boundaries]
 # Forbidden direction: the left side may not import the right side.

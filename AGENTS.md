@@ -7,8 +7,9 @@ Run `gate check --changed` before you finish. It must pass.
 
 ### Limits
 
-- Functions: cyclomatic complexity at most 15 (warns above 10), at most 60 lines, at most 5 parameters.
-- Files: at most 300 lines (warns above 200).
+- Functions: cyclomatic complexity at most 15 (warns above 10), at most 80 lines, at most 5 parameters.
+- Files: at most 500 lines (warns above 300).
+- Test files: at most 1000 lines.
 
 ### Boundaries
 

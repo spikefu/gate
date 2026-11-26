@@ -4,13 +4,6 @@
 lint = "ruff check ."
 typecheck = "mypy"
 
-[complexity]
-max_function_lines = 60
-
-[size]
-max_file_lines_warn = 200
-max_file_lines_fail = 300
-
 [tests.unit]
 command = "pytest -q tests/unit"
 
