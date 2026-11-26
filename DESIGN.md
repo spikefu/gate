@@ -81,7 +81,7 @@ moves. The baseline matches on it.
 | `syntax` | Parse errors. Blocks when a native parser agrees (Python, TOML) or the language is listed in `[syntax] fail_on`; otherwise warns, because tree-sitter grammars can lag the language they parse |
 | `complexity` | Cyclomatic complexity (warn and fail limits), function length, parameter count, with per-glob overrides |
 | `size` | File line count, a longer limit for test files, and per-glob overrides |
-| `boundaries` | `a !-> b` forbidden imports, "only X may import Y" rules for ports and adapters, both also against outside packages (`pkg:name`), and import cycles |
+| `boundaries` | `a !-> b` forbidden imports, "only X may import Y" rules for ports and adapters, both also against outside packages (`pkg:name`), module entry points, and import cycles |
 | `suppressions` | Markers that switch a check off: lint and type ignores, skipped tests, coverage exclusions |
 | `duplication` | Blocks of code identical to code elsewhere in the repo, apart from layout and comments |
 | `dead-code` | Top-level definitions whose name appears nowhere else in the repo |
@@ -271,6 +271,23 @@ it installed, not whichever version the machine happens to have.
 
 Boundaries follow relative imports, tsconfig `paths` aliases and workspace
 package names for JS/TS, and absolute and relative imports for Python.
+
+### Module entry points
+
+`[[boundaries.module]]` declares folders to be modules: `path = "src/billing"`
+for one, or `path = "src/modules/*"` for one per folder matched. Code outside
+a module may then import only its entry point, `index.*` or `__init__.py`
+unless `entry` lists other files. What sits behind the entry is the module's
+own business and can be reshaped without touching its users, which is the
+point of encapsulation and the thing a folder alone does not give you.
+
+A module's own files import each other freely, and tests are exempt, since a
+unit test may need the internals it tests. Type-only imports count.
+
+In Python, `from pkg import name` asks the package for `name`, which may be
+something `__init__` exports or a submodule of the same name; the text cannot
+say which, so it is read as going through the entry. `from pkg.name import x`
+and `import pkg.name` name the submodule and are findings.
 
 ### Outside packages in boundary rules
 

@@ -199,4 +199,7 @@ def _boundaries(p: Plan) -> list[str]:
             "# Proposed from today's imports: every rule below already holds.",
             "# Delete the ones that are coincidence rather than intent.",
             "# A rule can also keep out an outside package: \"src/domain !-> pkg:fs\".",
+            "# To make folders modules that are imported only through their index, add after this list:",
+            "#   [[boundaries.module]]",
+            '#   path = "src/modules/*"',
             "forbid = [", *(f"  {json.dumps(rule)}," for rule in p.boundaries), "]"]

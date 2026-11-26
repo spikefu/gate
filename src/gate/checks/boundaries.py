@@ -7,10 +7,10 @@ forbid list cannot say without enumerating every other directory.
 
 from __future__ import annotations
 
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 from ..context import CODE_EXTS, Context
-from ..files import matches
+from ..files import is_test, matches
 from ..findings import Finding
 from ..lang import cycles
 from ..lang.import_graph import Edge, edges_for, externals_for, matches_package
@@ -22,17 +22,47 @@ PACKAGE = "pkg:"
 def run(ctx: Context) -> list[Finding]:
     rules = ctx.config.boundaries
     findings: list[Finding] = []
-    if rules.forbid or rules.only:
+    if rules.forbid or rules.only or rules.modules:
         graph = edges_for(ctx.root, ctx.repo_files, ctx.code_files())
         for src, edges in graph.items():
             for edge in edges:
-                reason = _violation(ctx, src, edge.target)
+                reason = _violation(ctx, src, edge.target) or _reaches_inside(rules, src, edge)
                 if reason:
                     findings.append(_finding(src, edge, reason))
         findings += _outside(ctx)
     if rules.cycles:
         findings += _cycles(ctx)
     return findings
+
+
+def _reaches_inside(rules: Boundaries, src: str, edge: Edge) -> str | None:
+    """Whether `src` imports a file inside a module it is not part of, other than the module's entry."""
+    if is_test(src) or _asked_the_package(edge):
+        return None  # a test may need a module's internals to test them
+    dst = edge.target
+    for rule in rules.modules:
+        found = rule.inside(dst)
+        if found is None:
+            continue
+        module, inner = found
+        if src.startswith(module + "/") or rule.is_entry(inner):
+            return None
+        entry = ", ".join(rule.entry) or "its entry point"
+        why = f" ({rule.why})" if rule.why else ""
+        return f"reaches inside the module {module}: import it through {entry}{why}"
+    return None
+
+
+def _asked_the_package(edge: Edge) -> bool:
+    """Python's `from pkg import name` asks the package for `name`, which may be something its
+    `__init__` exports or a submodule of the same name. The text cannot say which, so it is read
+    as going through the package. `from pkg.name import x` names the submodule and is not."""
+    words = edge.spec.split()
+    if len(words) < 2 or words[0] != "from":
+        return False
+    asked = words[1].rsplit(".", 1)[-1]
+    target = PurePosixPath(edge.target)
+    return asked != (target.parent.name if target.name == "__init__.py" else target.stem)
 
 
 def _outside(ctx: Context) -> list[Finding]:

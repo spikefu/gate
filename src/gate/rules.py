@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .config import Config
-from .settings import OnlyRule
+from .settings import ModuleRule, OnlyRule
 
 START = "<!-- gate:rules:start -->"
 END = "<!-- gate:rules:end -->"
@@ -108,14 +108,20 @@ def _limits(config: Config) -> list[str]:
 
 def _boundaries(config: Config) -> list[str]:
     b = config.boundaries
-    if not b.forbid and not b.only and not b.cycles:
+    if not b.forbid and not b.only and not b.modules and not b.cycles:
         return []
     out = ["", "### Boundaries", ""]
     if b.cycles:
         out.append("- Modules must not import each other in a loop. Type-only imports, and imports inside a function, "
                    "do not count.")
     out += [f"- `{left}` must not import {_named(right)}." for left, right in b.forbid]
-    return out + [_only(rule) for rule in b.only]
+    return out + [_only(rule) for rule in b.only] + [_module(rule) for rule in b.modules]
+
+
+def _module(rule: ModuleRule) -> str:
+    entry = ", ".join(f"`{e}`" for e in rule.entry) or "its entry point (`index.*` or `__init__.py`)"
+    why = f" {rule.why.rstrip('.')}." if rule.why else ""
+    return f"- `{rule.path}` is a module: code outside it may import only {entry}, never the files behind it.{why}"
 
 
 def _only(rule: OnlyRule) -> str:

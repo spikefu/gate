@@ -10,6 +10,7 @@ would leave a rule unenforced while everyone believes it is on.
 from __future__ import annotations
 
 from dataclasses import dataclass, replace
+from fnmatch import fnmatchcase
 
 from .files import matches
 
@@ -107,9 +108,34 @@ class OnlyRule:
 
 
 @dataclass(frozen=True)
+class ModuleRule:
+    """Folders that are modules: code outside one may import only its entry files."""
+    path: str  # a folder, or a pattern such as `src/modules/*` naming one module per match
+    # Files outsiders may import, relative to the module. Empty means the language's
+    # own entry point: `index.*` or `__init__.py`.
+    entry: tuple[str, ...] = ()
+    why: str = ""
+
+    def inside(self, rel: str) -> tuple[str, str] | None:
+        """If `rel` is a file within one of these modules: (the module's folder, the file's path inside it)."""
+        parts = rel.split("/")
+        depth = len(self.path.split("/"))
+        root = "/".join(parts[:depth])
+        if len(parts) <= depth or not matches(root, self.path):
+            return None
+        return root, "/".join(parts[depth:])
+
+    def is_entry(self, inner: str) -> bool:
+        if self.entry:
+            return any(fnmatchcase(inner, pattern) for pattern in self.entry)
+        return inner == "__init__.py" or ("/" not in inner and inner.rsplit(".", 1)[0] == "index")
+
+
+@dataclass(frozen=True)
 class Boundaries:
     forbid: tuple[tuple[str, str], ...] = ()
     only: tuple[OnlyRule, ...] = ()
+    modules: tuple[ModuleRule, ...] = ()
     # Modules importing each other in a loop are findings.
     cycles: bool = True
 
@@ -182,10 +208,20 @@ def read_boundaries(table: dict) -> Boundaries:
             raise ConfigError("[[boundaries.only]] needs 'target' and 'allowed_from'")
         only.append(OnlyRule(o["target"], tuple(o["allowed_from"]), o.get("why", ""),
                              tuple(o.get("applies_to", ()))))
-    unknown = set(table) - {"forbid", "only", "cycles"}
+    unknown = set(table) - {"forbid", "only", "module", "cycles"}
     if unknown or not isinstance(table.get("cycles", True), bool):
-        raise ConfigError(f"[boundaries]: keys are forbid, only and cycles (true or false); got {', '.join(sorted(table))}")
-    return Boundaries(tuple(forbid), tuple(only), table.get("cycles", True))
+        raise ConfigError("[boundaries]: keys are forbid, only, module and cycles (true or false); "
+                          f"got {', '.join(sorted(table))}")
+    modules = tuple(_module_rule(m) for m in table.get("module", []))
+    return Boundaries(tuple(forbid), tuple(only), modules, table.get("cycles", True))
+
+
+def _module_rule(table: dict) -> ModuleRule:
+    path = str(table.get("path", "")).strip("/")
+    if not path or "**" in path or set(table) - {"path", "entry", "why"}:
+        raise ConfigError("[[boundaries.module]] needs 'path' (a folder, or a pattern like 'src/modules/*' without '**'), "
+                          "and takes only 'entry' and 'why' besides")
+    return ModuleRule(path, tuple(table.get("entry", ())), table.get("why", ""))
 
 
 def read_suppressions(table: dict) -> tuple[str, ...]:

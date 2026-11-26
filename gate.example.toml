@@ -92,6 +92,14 @@ allowed_from = ["apps/server/src/modules"]
 applies_to = ["apps/server/src"]   # optional: which importers the rule governs
 why = "Database access stays behind module interfaces."
 
+# Encapsulation: these folders are modules. Code outside one may import only
+# its entry point (`index.*` or `__init__.py` unless `entry` says otherwise),
+# so everything behind it can change freely. Tests are exempt.
+[[boundaries.module]]
+path = "apps/server/src/modules/*"   # one module per folder matched
+entry = ["index.ts", "types.ts"]     # optional; relative to the module
+why = "A module's files are its own business."
+
 [[boundaries.only]]                # the same for an outside package: one adapter owns it
 target = "pkg:pg"
 allowed_from = ["apps/server/src/db"]
