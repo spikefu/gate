@@ -12,7 +12,8 @@ from pathlib import Path
 
 from .files import matches
 
-STRUCTURAL = ("syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "dead-code")
+STRUCTURAL = ("syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "dead-code",
+              "new-dependencies")
 SUPPRESSION_KINDS = ("lint", "type", "test", "coverage")
 TOOLCHAIN = ("lint", "typecheck", "format", "security", "deps")
 # Designed but not built yet. Accepted in config so a file written against the

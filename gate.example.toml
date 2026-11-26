@@ -11,7 +11,8 @@ exclude = ["**/node_modules/**", "**/dist/**", "**/build/**", "**/*.generated.*"
 # A profile is a named list of checks. Adapters pick one.
 
 [profiles]
-fast = ["syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "dead-code", "lint"]   # agent hook: seconds, changed files
+fast = ["syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "dead-code", "new-dependencies",
+        "lint"]   # agent hook: seconds, changed files
 full = ["syntax", "complexity", "size", "boundaries", "suppressions", "lint",
         "typecheck", "unit", "integration", "test-quality", "docs"]    # CI and pre-merge
 default = "fast"

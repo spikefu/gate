@@ -27,6 +27,7 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
 gate init                       # writes gate.toml from the repo's own scripts and imports
 gate check                      # see what breaks the rules today
 gate baseline --accept          # record that as the starting point (your decision)
+gate dependencies --accept      # approve the packages the repo uses today (your decision)
 gate rules                      # tell agents the rules, in AGENTS.md / CLAUDE.md
 gate todo                       # the baseline as a work queue, worst file first
 ```
@@ -95,6 +96,7 @@ agent change `gate.toml`, a limit, or the baseline by itself.
 | `suppressions` | any added marker that switches a check off: lint and type ignores, skipped tests, coverage exclusions |
 | `duplication` | a block of 10 or more lines identical to code elsewhere in the repo |
 | `dead-code` | a top-level definition whose name appears nowhere else in the repo |
+| `new-dependencies` | a package in a manifest that nobody has approved with `gate dependencies --accept` |
 | `test-integrity` | on `--changed`: the change leaves the repo with fewer tests or fewer assertions |
 | `boundaries` | `a !-> b` rules and "only X may import Y" rules, through relative imports, tsconfig aliases and workspace packages |
 | `lint`, `typecheck`, `format`, `security`, `deps` | your command, or the first installed tool for the language |

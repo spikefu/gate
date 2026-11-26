@@ -7,7 +7,19 @@ from collections.abc import Callable
 from pathlib import Path
 
 from . import baseline, files
-from .checks import boundaries, command, complexity, dead_code, duplication, size, suppressions, syntax, test_integrity, toolchain
+from .checks import (
+    boundaries,
+    command,
+    complexity,
+    dead_code,
+    duplication,
+    new_dependencies,
+    size,
+    suppressions,
+    syntax,
+    test_integrity,
+    toolchain,
+)
 from .config import PLANNED, TOOLCHAIN, Config
 from .context import Context
 from .findings import Finding, Report, Skipped
@@ -21,6 +33,7 @@ _STRUCTURAL: dict[str, Callable[[Context], list[Finding]]] = {
     "test-integrity": test_integrity.run,
     "duplication": duplication.run,
     "dead-code": dead_code.run,
+    "new-dependencies": new_dependencies.run,
 }
 
 

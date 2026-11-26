@@ -61,7 +61,7 @@ def test_init_detects_pytest_and_invents_nothing_else(repo):
 
 def test_init_on_an_empty_repo_still_gives_structural_checks(repo):
     plan = init.plan(repo.context())
-    assert plan.fast == ["syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "dead-code"]
+    assert plan.fast == ["syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "dead-code", "new-dependencies"]
     assert plan.tests == {} and plan.boundaries == []
 
 

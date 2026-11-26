@@ -1,6 +1,6 @@
 """Project commands through the real CLI: exit codes, timeouts, and whose fault a failure is on a scoped run."""
 
-from conftest import check_json
+from conftest import check_json, gate
 
 
 def test_commands_pass_and_fail_by_exit_code(repo):
@@ -86,3 +86,30 @@ def test_commands_find_tools_in_the_repos_own_virtualenv_before_path(repo):
     repo.write(".venv/bin/projlint", "#!/bin/sh\nexit 0\n")
     (repo.root / ".venv/bin/projlint").chmod(0o755)
     assert check_json(repo)[0] == 0
+
+
+def test_a_new_dependency_fails_until_a_person_approves_it(repo):
+    repo.write("gate.toml", '[profiles]\nfast = ["new-dependencies"]\n')
+    repo.write("package.json", '{"dependencies": {"react": "^19"}}\n')
+    code, report = check_json(repo)
+    assert code == 0 and "new-dependencies" in report["skipped"], "nothing approved yet: skipped, and said so"
+    assert check_json(repo, "--strict")[0] == 1
+    assert "1 declared, none approved yet" in gate(repo, "dependencies")[1]
+
+    assert "approved 1 package(s)" in gate(repo, "dependencies", "--accept")[1]
+    assert check_json(repo, "--strict")[0] == 0
+    repo.commit()
+
+    repo.write("package.json", '{"dependencies": {"react": "^19", "reakt-utils": "^1"}}\n')
+    code, report = check_json(repo, "--changed")
+    (finding,) = report["findings"]
+    assert code == 1 and finding["symbol"] == "reakt-utils"
+    out = gate(repo, "dependencies")[1]
+    assert "1 approved, 1 new, 0 approved but no longer declared" in out and "new  reakt-utils (npm)  package.json:1" in out
+
+    gate(repo, "dependencies", "--accept")
+    assert check_json(repo, "--changed")[0] == 0
+    repo.write("package.json", '{"dependencies": {"reakt-utils": "^1"}}\n')
+    assert "2 approved, 0 new, 1 approved but no longer declared" in gate(repo, "dependencies")[1]
+    gate(repo, "dependencies", "--accept")
+    assert "1 approved, 0 new, 0 approved but no longer declared" in gate(repo, "dependencies")[1], "approving again drops it"

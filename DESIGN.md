@@ -41,6 +41,7 @@ and defaults; each repo declares its own limits, boundaries and commands in
 | `gate baseline` | Report, accept (`--accept`) or shrink (`--prune`) recorded violations; `--check` fails if it is stale |
 | `gate todo` | List the baseline as a work queue, worst file first |
 | `gate gaps` | List weaknesses in the repo's rules that gate can see for itself; always exits 0 |
+| `gate dependencies` | Show packages nobody has approved; `--accept` approves the current set |
 | `gate rules` | Write the rules as prose into `AGENTS.md` / `CLAUDE.md`; `--check` fails if they lag `gate.toml` |
 
 `gate check` flags: `--changed [--base REF]` for the git diff plus untracked
@@ -84,6 +85,7 @@ moves. The baseline matches on it.
 | `suppressions` | Markers that switch a check off: lint and type ignores, skipped tests, coverage exclusions |
 | `duplication` | Blocks of code identical to code elsewhere in the repo, apart from layout and comments |
 | `dead-code` | Top-level definitions whose name appears nowhere else in the repo |
+| `new-dependencies` | A package declared in a manifest that nobody has approved |
 | `test-integrity` | On a `--changed` run: the change leaves fewer tests, or fewer assertions, than the base ref had |
 | `lint`, `typecheck`, `format`, `security`, `deps` | The repo's own command, or the first installed tool for each language present |
 | `[tests.<name>]` | The repo's own test commands, judged by exit code |
@@ -144,6 +146,26 @@ Default exports and files that nothing imports are not judged, so a wholly
 unused file is not found; that needs a tool that knows the framework's entry
 points. `[dead-code] ignore` lists names used in ways the text does not show,
 and `exclude` leaves out files such as a published package's public API.
+
+### New dependencies
+
+A dependency is outside code that runs with the repo's permissions, and
+adding one takes a single line. An agent will add one to save writing twenty
+lines, and now and then names a package that does not exist, which someone
+else can then register. So a new package name is a person's decision.
+
+`.gate/dependencies.json` holds the approved names per ecosystem, and is
+meant to be committed. `gate dependencies --accept` writes it from what is
+declared today; like `baseline --accept`, no adapter runs it. The check fails
+for any declared name not on the list. Until a list exists the check reports
+itself as skipped, so adopting gate does not start with a wall of failures,
+and `--strict` in CI still forces the decision.
+
+Direct dependencies are read from `package.json`, `pyproject.toml`,
+`requirements*.txt`, `go.mod`, `Cargo.toml` and `Gemfile`; lockfiles are not
+read. Only names are tracked: a version change is not a new dependency, and a
+name approved once is approved in every manifest. It is not baselined, because
+an approved package is not a violation waiting to be cleaned up.
 
 ### Test integrity
 

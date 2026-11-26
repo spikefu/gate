@@ -43,6 +43,7 @@ def render(config: Config) -> str:
         *_suppressions(config),
         *_duplication(config),
         *_dead_code(config),
+        *_dependencies(config),
         "",
         "### Checks",
         "",
@@ -164,6 +165,19 @@ def _dead_code(config: Config) -> list[str]:
         "- Do not leave code nothing uses. A function, class, constant or type whose name appears nowhere else "
         "in the repo fails.",
         "- When you change approach, delete what the first attempt left behind. Do not keep it \"in case\".",
+    ]
+
+
+def _dependencies(config: Config) -> list[str]:
+    if not any("new-dependencies" in checks for checks in config.profiles.values()):
+        return []
+    return [
+        "",
+        "### Dependencies",
+        "",
+        "- Do not add a package without saying so. A dependency nobody has approved fails the gate.",
+        "- If one is needed, say why in your report, and confirm the package exists under exactly that name. "
+        "Never run `gate dependencies --accept`: approving a package is the human's decision.",
     ]
 
 

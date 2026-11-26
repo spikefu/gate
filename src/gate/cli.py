@@ -6,7 +6,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import baseline, files, gaps, init, rules, runner, todo
+from . import baseline, dependencies, files, gaps, init, rules, runner, todo
 from .config import ConfigError, load
 
 OK, FAILED, USAGE = 0, 1, 2
@@ -64,7 +64,12 @@ def _parser() -> argparse.ArgumentParser:
     weak.add_argument("--json", action="store_true", help="machine-readable output")
     weak.set_defaults(handler=_gaps)
 
-    for p in (check, base, queue, start, prose, weak):
+    deps = sub.add_parser("dependencies", help="show packages nobody has approved, or approve the current set")
+    deps.add_argument("--accept", action="store_true",
+                      help="approve every package declared today; a human decision, not for automation")
+    deps.set_defaults(handler=_dependencies)
+
+    for p in (check, base, queue, start, prose, weak, deps):
         p.add_argument("--root", default=".", help="repo root (default: current directory)")
         p.add_argument("--config", help="path to gate.toml (default: <root>/gate.toml)")
     return parser
@@ -132,6 +137,27 @@ def _rules(args, root: Path, config) -> int:
         print(f"rules: wrote {path.relative_to(root)}")
     if not changed:
         print("rules: up to date")
+    return OK
+
+
+def _dependencies(args, root: Path, config) -> int:
+    ctx = runner.build_context(root, config, None)
+    declared = dependencies.declared(root, ctx.repo_files)
+    now, approved = dependencies.current(declared), dependencies.load(root)
+    if args.accept:
+        dependencies.save(root, now)
+        print(f"dependencies: approved {dependencies.count(now)} package(s) into {dependencies.FILE}")
+        return OK
+    if approved is None:
+        print(f"dependencies: {dependencies.count(now)} declared, none approved yet. "
+              "Review them, then run `gate dependencies --accept`.")
+        return OK
+    new = dependencies.unapproved(declared, approved)
+    gone = dependencies.count(approved) - sum(1 for eco, names in approved.items() for n in names if n in now.get(eco, ()))
+    print(f"dependencies: {dependencies.count(approved)} approved, {len({(d.ecosystem, d.name) for d in new})} new, "
+          f"{gone} approved but no longer declared")
+    for dep in new:
+        print(f"  new  {dep.name} ({dep.ecosystem})  {dep.path}" + (f":{dep.line}" if dep.line else ""))
     return OK
 
 

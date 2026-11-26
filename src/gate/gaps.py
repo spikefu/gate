@@ -13,7 +13,7 @@ import json
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from . import baseline, files, propose, rules
+from . import baseline, dependencies, files, propose, rules
 from .checks import complexity, toolchain
 from .config import TOOLCHAIN, Config
 from .context import Context
@@ -153,6 +153,12 @@ def _upkeep(ctx: Context) -> list[Gap]:
     if recorded:
         out.append(Gap("upkeep", f"{baseline.size(recorded)} violation(s) are tolerated by the baseline.",
                        "Run `gate todo` for the next file to clean up."))
+    scheduled = {check for checks in ctx.config.profiles.values() for check in checks}
+    declared = dependencies.current(dependencies.declared(ctx.root, ctx.repo_files))
+    if "new-dependencies" in scheduled and declared and dependencies.load(ctx.root) is None:
+        out.append(Gap("upkeep", f"{dependencies.count(declared)} package(s) are declared and none has been approved, "
+                                 "so a new one is not noticed.",
+                       "Review them, then run `gate dependencies --accept`."))
     if rules.stale(ctx.root, ctx.config):
         out.append(Gap("upkeep", "The rules written out for agents are missing or lag gate.toml.", "Run `gate rules`."))
     return out
