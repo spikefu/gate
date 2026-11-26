@@ -81,7 +81,7 @@ moves. The baseline matches on it.
 | `syntax` | Parse errors. Blocks when a native parser agrees (Python, TOML) or the language is listed in `[syntax] fail_on`; otherwise warns, because tree-sitter grammars can lag the language they parse |
 | `complexity` | Cyclomatic complexity (warn and fail limits), function length, parameter count, with per-glob overrides |
 | `size` | File line count, a longer limit for test files, and per-glob overrides |
-| `boundaries` | `a !-> b` forbidden imports, "only X may import Y" rules for ports and adapters, and import cycles |
+| `boundaries` | `a !-> b` forbidden imports, "only X may import Y" rules for ports and adapters, both also against outside packages (`pkg:name`), and import cycles |
 | `suppressions` | Markers that switch a check off: lint and type ignores, skipped tests, coverage exclusions |
 | `duplication` | Blocks of code identical to code elsewhere in the repo, apart from layout and comments |
 | `dead-code` | Top-level definitions whose name appears nowhere else in the repo |
@@ -271,6 +271,26 @@ it installed, not whichever version the machine happens to have.
 
 Boundaries follow relative imports, tsconfig `paths` aliases and workspace
 package names for JS/TS, and absolute and relative imports for Python.
+
+### Outside packages in boundary rules
+
+A rule's target can be `pkg:<name>`: an outside package or a built-in module.
+`src/domain !-> pkg:fs` keeps I/O out of a folder; `src/domain !-> pkg:express`
+keeps a framework out; an only-rule with `target = "pkg:pg"` gives a
+dependency a single owner. Together these express a functional core and
+ports and adapters for third-party code, which path rules alone cannot: the
+things most worth isolating are usually not in the repo.
+
+A pattern covers the package and everything inside it, so `pkg:fs` matches
+`node:fs` and `fs/promises`, and `pkg:os` matches `os.path`, while
+`pkg:express` does not match `express-session`. Wildcards work
+(`pkg:@aws-sdk/*`). Type-only and deferred imports count: the rule is about
+depending on the package at all.
+
+An import is outside when it does not point into the repo: not relative, not
+a tsconfig alias, not a workspace package. In Python, a name is the repo's
+own only if a module or package of that name sits at a source root, so a
+`logging.py` inside a package does not hide the standard library's.
 
 On a `--changed` run, a project-wide tool that fails only in files outside the
 change warns instead of blocking. Files are recognised in its output as whole

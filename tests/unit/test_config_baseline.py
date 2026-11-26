@@ -43,6 +43,7 @@ def test_missing_config_gives_the_documented_defaults(tmp_path):
     ("[change-size]\nmax_lines = 0\n", "change-size"),
     ("[change-size]\nlimit = 5\n", "limit"),
     ("[boundaries]\ncycle = false\n", "cycles"),
+    ('[boundaries]\nforbid = ["pkg:express !-> src"]\n', "cannot be the importer"),
     ("[coverage]\nmin_changed_percent = 120\n", "coverage"),
     ('[coverage]\nreprot = "x"\n', "reprot"),
     ('[boundaries]\ncycles = "no"\n', "cycles"),

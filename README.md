@@ -100,7 +100,7 @@ agent change `gate.toml`, a limit, or the baseline by itself.
 | `change-size` | nothing by default: on `--changed` it warns when a change adds over 400 lines of non-test code |
 | `coverage` | on `--changed`: the tests run under 80% of the lines the change adds. Opt-in: needs `[coverage] report` |
 | `test-integrity` | on `--changed`: the change leaves the repo with fewer tests or fewer assertions |
-| `boundaries` | `a !-> b` rules, "only X may import Y" rules, and import cycles, through relative imports, tsconfig aliases and workspace packages |
+| `boundaries` | `a !-> b` rules and "only X may import Y" rules, against folders or outside packages (`src/domain !-> pkg:fs`), and import cycles |
 | `lint`, `typecheck`, `format`, `security`, `deps` | your command, or the first installed tool for the language |
 | `[tests.<name>]`, `[[command]]` | exit code of your own command |
 

@@ -120,3 +120,10 @@ def test_prose_states_the_coverage_bar_only_when_a_report_is_configured_and_the_
     assert "### Coverage" not in rules.render(config(repo, text)), "configured but in no profile"
     block = rules.render(config(repo, text + '[profiles]\nfull = ["syntax", "coverage"]\n'))
     assert "run at least 70% of the lines a change adds" in block
+
+
+def test_prose_names_outside_packages_as_packages(repo):
+    block = rules.render(config(repo, '[boundaries]\nforbid = ["src/domain !-> pkg:fs"]\n'
+                                      '[[boundaries.only]]\ntarget = "pkg:pg"\nallowed_from = ["src/db"]\n'))
+    assert "- `src/domain` must not import the package `fs`." in block
+    assert "- Only `src/db` may import the package `pg`." in block

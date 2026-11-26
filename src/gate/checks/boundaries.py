@@ -13,8 +13,10 @@ from ..context import CODE_EXTS, Context
 from ..files import matches
 from ..findings import Finding
 from ..lang import cycles
-from ..lang.import_graph import Edge, edges_for
-from ..settings import OnlyRule
+from ..lang.import_graph import Edge, edges_for, externals_for, matches_package
+from ..settings import Boundaries, OnlyRule
+
+PACKAGE = "pkg:"
 
 
 def run(ctx: Context) -> list[Finding]:
@@ -27,9 +29,39 @@ def run(ctx: Context) -> list[Finding]:
                 reason = _violation(ctx, src, edge.target)
                 if reason:
                     findings.append(_finding(src, edge, reason))
+        findings += _outside(ctx)
     if rules.cycles:
         findings += _cycles(ctx)
     return findings
+
+
+def _outside(ctx: Context) -> list[Finding]:
+    """Imports of outside packages that a rule keeps out of the importing file."""
+    rules = ctx.config.boundaries
+    named = [right for _left, right in rules.forbid] + [rule.target for rule in rules.only]
+    if not any(pattern.startswith(PACKAGE) for pattern in named):
+        return []
+    findings = []
+    for src, imports in externals_for(ctx.root, ctx.repo_files, ctx.code_files()).items():
+        for imported in imports:
+            reason = _package_violation(rules, src, imported.name)
+            if reason:
+                findings.append(Finding(
+                    check="boundaries", rule="import", key=f"boundaries:{src}->{PACKAGE}{imported.name}", path=src,
+                    line=imported.line, message=f"imports the package {imported.name}; {reason}",
+                ))
+    return findings
+
+
+def _package_violation(rules: Boundaries, src: str, name: str) -> str | None:
+    for left, right in rules.forbid:
+        if right.startswith(PACKAGE) and matches(src, left) and matches_package(name, right):
+            return f"rule: {left} !-> {right}"
+    for rule in rules.only:
+        if rule.target.startswith(PACKAGE) and matches_package(name, rule.target) and _governed_and_not_allowed(rule, src):
+            why = f" ({rule.why})" if rule.why else ""
+            return f"only {', '.join(rule.allowed_from)} may import {rule.target}{why}"
+    return None
 
 
 def _cycles(ctx: Context) -> list[Finding]:
@@ -80,6 +112,10 @@ def _breaks(rule: OnlyRule, src: str, dst: str) -> bool:
     """Whether `src` importing `dst` crosses into a target that only named layers may import."""
     if not matches(dst, rule.target) or matches(src, rule.target):
         return False  # not an import of the target, or the target importing itself
+    return _governed_and_not_allowed(rule, src)
+
+
+def _governed_and_not_allowed(rule: OnlyRule, src: str) -> bool:
     governed = not rule.applies_to or any(matches(src, scope) for scope in rule.applies_to)
     return governed and not any(matches(src, allowed) for allowed in rule.allowed_from)
 

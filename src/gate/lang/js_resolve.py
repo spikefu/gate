@@ -37,6 +37,18 @@ class Resolver:
                 return hit
         return self._package(spec)
 
+    def external(self, importer: str, spec: str) -> str | None:
+        """The outside package a spec names, or None when it points into this repo (found or not)."""
+        if spec.startswith((".", "/")) or self._alias_targets(importer, spec):
+            return None
+        spec = spec.removeprefix("node:")
+        parts = spec.split("/")
+        name = "/".join(parts[:2]) if spec.startswith("@") else parts[0]
+        # `@/x`, `~/x` and `#x` are alias conventions, never published package names.
+        if name in self.packages or not name or name[0] in "~#" or name == "@":
+            return None
+        return spec
+
     def _file(self, base: str) -> str | None:
         stem, ext = posixpath.splitext(base)
         swapped = [stem + e for e in _JS_TO_TS.get(ext, ())]

@@ -198,4 +198,5 @@ def _boundaries(p: Plan) -> list[str]:
             "# Modules importing each other in a loop are findings; `cycles = false` switches that off.",
             "# Proposed from today's imports: every rule below already holds.",
             "# Delete the ones that are coincidence rather than intent.",
+            "# A rule can also keep out an outside package: \"src/domain !-> pkg:fs\".",
             "forbid = [", *(f"  {json.dumps(rule)}," for rule in p.boundaries), "]"]

@@ -114,7 +114,7 @@ def _boundaries(config: Config) -> list[str]:
     if b.cycles:
         out.append("- Modules must not import each other in a loop. Type-only imports, and imports inside a function, "
                    "do not count.")
-    out += [f"- `{left}` must not import `{right}`." for left, right in b.forbid]
+    out += [f"- `{left}` must not import {_named(right)}." for left, right in b.forbid]
     return out + [_only(rule) for rule in b.only]
 
 
@@ -122,7 +122,12 @@ def _only(rule: OnlyRule) -> str:
     allowed = ", ".join(f"`{a}`" for a in rule.allowed_from)
     scope = f" (applies to code under {', '.join(f'`{s}`' for s in rule.applies_to)})" if rule.applies_to else ""
     why = f" {rule.why.rstrip('.')}." if rule.why else ""
-    return f"- Only {allowed} may import `{rule.target}`{scope}.{why}"
+    return f"- Only {allowed} may import {_named(rule.target)}{scope}.{why}"
+
+
+def _named(target: str) -> str:
+    """A boundary target in words: a path in the repo, or an outside package."""
+    return f"the package `{target.removeprefix('pkg:')}`" if target.startswith("pkg:") else f"`{target}`"
 
 
 _MARKERS = {

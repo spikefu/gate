@@ -165,13 +165,17 @@ def read_size(table: dict) -> Size:
     return Size(table.get("max_file_lines_warn", 300), fail, test_fail, overrides)
 
 
+def _forbid_rule(rule: str) -> tuple[str, str]:
+    left, sep, right = (part.strip() for part in rule.partition("!->"))
+    if not sep or not left or not right:
+        raise ConfigError(f"[boundaries] forbid rule must look like 'a !-> b': {rule!r}")
+    if left.startswith("pkg:"):
+        raise ConfigError(f"[boundaries] forbid: a package cannot be the importer, only what is imported: {rule!r}")
+    return left, right
+
+
 def read_boundaries(table: dict) -> Boundaries:
-    forbid = []
-    for rule in table.get("forbid", []):
-        left, sep, right = rule.partition("!->")
-        if not sep or not left.strip() or not right.strip():
-            raise ConfigError(f"[boundaries] forbid rule must look like 'a !-> b': {rule!r}")
-        forbid.append((left.strip(), right.strip()))
+    forbid = [_forbid_rule(rule) for rule in table.get("forbid", [])]
     only = []
     for o in table.get("only", []):
         if "target" not in o or not o.get("allowed_from"):
