@@ -118,7 +118,9 @@ finding, so a new function cannot hide behind an old one with the same name.
   `claude --plugin-dir /path/to/gate/adapters/claude-code`.
   The plugin also ships the `gate-cleanup` skill
   (`adapters/claude-code/skills/gate-cleanup/SKILL.md`): one file per pass from
-  `gate todo`, tests first, then `gate baseline --prune`, then stop for review.
+  `gate todo`. It shows the shape of the pass and waits for one go-ahead, then
+  pins behaviour with tests, refactors, runs `gate baseline --prune`, and
+  stops for review.
   It also ships `gate-review` (`skills/gate-review/SKILL.md`), for finding
   weaknesses in the rules and proposing changes. For other harnesses, point
   `AGENTS.md` at those files; the generated rules already carry the short
