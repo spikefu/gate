@@ -141,3 +141,11 @@ def test_an_explicit_override_beats_the_test_file_limit(repo):
     repo.write("gate.toml", '[size]\nmax_test_file_lines_fail = 50\n[[size.override]]\nglob = "tests/**"\nmax_file_lines_fail = 10\n')
     repo.write("tests/a.py", "x = 1\n" * 15)
     assert [f.severity for f in size.run(repo.context())] == ["fail"]
+
+
+def test_raising_the_general_file_limit_past_the_test_default_raises_it_for_tests_too(repo):
+    # Otherwise a repo that allows 1500-line files would hold its tests to a stricter 1000.
+    repo.write("gate.toml", "[size]\nmax_file_lines_fail = 1500\n")
+    repo.write("tests/test_big.py", "x = 1\n" * 1200)
+    repo.write("src/big.py", "x = 1\n" * 1200)
+    assert [f for f in size.run(repo.context()) if f.severity == "fail"] == []

@@ -88,3 +88,11 @@ def test_other_warnings_do_not_interrupt(repo, request):
     repo.commit()
     repo.write("a.py", branchy("f", 11))   # complexity warning, not a failure
     assert stop(repo, request.node.name) == (0, "", "")
+
+
+def test_block_message_carries_the_tools_own_output_so_the_agent_can_act_on_it(repo, request):
+    repo.write("gate.toml", '[toolchain]\nlint = "echo \'a.py:3: unused variable total\'; exit 1"\n[profiles]\nfast = ["lint"]\n')
+    repo.commit()
+    repo.write("a.py", "x = 1\n")
+    _, out, _ = stop(repo, request.node.name)
+    assert "    a.py:3: unused variable total" in json.loads(out)["reason"]
