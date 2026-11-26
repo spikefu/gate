@@ -13,11 +13,12 @@ of the product code's own structure.
 from __future__ import annotations
 
 import json
+import re
 from collections import Counter
 from dataclasses import replace
 from pathlib import Path, PurePosixPath
 
-from .checks import complexity, dead_code, mutable_state
+from .checks import complexity, dead_code, mutable_state, syntax
 from .context import CODE_EXTS, Context
 from .files import is_test
 from .lang.import_graph import edges_for, externals_for
@@ -94,10 +95,31 @@ def _file(ctx: Context, rel: str, functions: list, packages: list[str], coupling
         # False where gate cannot read this language's imports: the zeros above then mean unknown, not none.
         "imports_read": is_module,
         "packages": packages,
+        # The lines each import statement takes up, as [first, last]: so a tool reading the file can tell them from code.
+        "import_lines": _import_lines(ctx.root / rel, text),
         # What the file offers: exported declarations in JS/TS, top-level functions and classes in Python.
         "definitions": len(dead_code.definitions(rel, text)) if is_module else 0,
         "shared_state": len(mutable_state.variables(ctx.root / rel, rel)),
     }
+
+
+_IMPORT_STATEMENT = re.compile(r"\s*(import\b(?!\s*\()|from\b)")
+
+
+def _import_lines(path: Path, text: str) -> list[list[int]]:
+    """Where the file's import statements are. None are reported for a language the parser does not know."""
+    if syntax.tslp is None:
+        return []
+    try:
+        lang = syntax.tslp.detect_language_from_path(str(path))
+        if lang not in syntax.LANGS:
+            return []
+        found = syntax.tslp.process(text, syntax.tslp.ProcessConfig(language=lang, imports=True)).imports
+    except Exception:  # a file the parser cannot take has no import lines to report, which costs nothing
+        return []
+    # An import made by calling `import(...)` is an expression in the middle of code, not a statement of its own.
+    return sorted([item.span.start_line + 1, item.span.end_line + 1] for item in found
+                  if item.span is not None and _IMPORT_STATEMENT.match(item.source or ""))
 
 
 def _is_entry(rel: str) -> bool:

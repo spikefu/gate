@@ -419,7 +419,7 @@ product files as an edge, for tools that draw the structure, and marks each
 file whose language it cannot read imports for, so a zero there is not read as none.
 It lists apart the edges that are only a type or are made after the file has loaded,
 which the loop check also leaves out, and for each file its functions with the lines
-they run from and to, nested ones included. Test files are left out, as subjects and as
+they run from and to, nested ones included, and the lines its import statements take up. Test files are left out, as subjects and as
 importers. `--changed` narrows it to a change, with dependents still counted
 from the whole repo. It judges nothing and always exits 0.
 

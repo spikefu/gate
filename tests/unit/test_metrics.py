@@ -113,3 +113,17 @@ def test_each_function_is_listed_with_its_lines_including_one_inside_another(rep
     listed = files["src/make.ts"]["function_list"]
     assert [(f["name"], f["line"], f["end_line"]) for f in listed] == [("make", 1, 11), ("add", 2, 4), ("run", 6, 9)]
     assert [f["complexity"] for f in listed] == [1, 1, 2] and files["src/make.ts"]["functions"] == 3
+
+
+def test_the_lines_each_import_statement_takes_up_are_reported(repo):
+    repo.write("src/a.ts", 'import type { B } from "./b"\nimport {\n  c,\n  d,\n} from "./c"\n\nexport const a = c\n'
+                           'export const later = () => import("./b")\n')
+    repo.write("src/b.ts", "export type B = number\n")
+    repo.write("src/c.ts", "export const c = 1\nexport const d = 2\n")
+    repo.write("pkg/m.py", "import os\nfrom pkg import (\n    helpers,\n)\n\n\ndef f():\n    return os.sep\n")
+    repo.write("pkg/__init__.py", "")
+    repo.write("pkg/helpers.py", "")
+    files, _ = collect(repo)
+    assert files["src/a.ts"]["import_lines"] == [[1, 1], [2, 5]], "the import made by a call on line 8 is code, not a statement"
+    assert files["pkg/m.py"]["import_lines"] == [[1, 1], [2, 4]]
+    assert files["src/b.ts"]["import_lines"] == []
