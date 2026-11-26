@@ -14,6 +14,7 @@ from ..files import matches
 from ..findings import Finding
 from ..lang import cycles
 from ..lang.import_graph import Edge, edges_for
+from ..settings import OnlyRule
 
 
 def run(ctx: Context) -> list[Finding]:
@@ -37,19 +38,21 @@ def _cycles(ctx: Context) -> list[Finding]:
     edges = edges_for(ctx.root, ctx.repo_files, code)
     graph = {src: sorted({e.target for e in found if _loads(src, e)}) for src, found in edges.items()}
     judged = set(ctx.files)
-    out = []
-    for group in cycles.tangles(graph):
-        if judged.isdisjoint(group):
-            continue
-        loop = cycles.shortest_loop(graph, group[0])
-        out.append(Finding(
-            check="boundaries", rule="cycle", key=f"boundaries/cycle:{group[0]}", path=group[0],
-            line=next((e.line for e in edges[group[0]] if e.target == loop[1]), None), value=len(group), limit=0,
-            message=f"{len(group)} modules import each other in a loop: move what they share into a module "
-                    "neither depends on, or pass it in",
-            detail=" -> ".join(loop) + (f"\nall {len(group)}: {', '.join(group)}" if len(group) > len(loop) - 1 else ""),
-        ))
-    return out
+    return [
+        _cycle_finding(group, cycles.shortest_loop(graph, group[0]), edges[group[0]])
+        for group in cycles.tangles(graph) if not judged.isdisjoint(group)
+    ]
+
+
+def _cycle_finding(group: list[str], loop: list[str], first_edges: list[Edge]) -> Finding:
+    everyone = f"\nall {len(group)}: {', '.join(group)}" if len(group) > len(loop) - 1 else ""
+    return Finding(
+        check="boundaries", rule="cycle", key=f"boundaries/cycle:{group[0]}", path=group[0],
+        line=next((e.line for e in first_edges if e.target == loop[1]), None), value=len(group), limit=0,
+        message=f"{len(group)} modules import each other in a loop: move what they share into a module "
+                "neither depends on, or pass it in",
+        detail=" -> ".join(loop) + everyone,
+    )
 
 
 def _loads(src: str, edge: Edge) -> bool:
@@ -67,14 +70,18 @@ def _violation(ctx: Context, src: str, dst: str) -> str | None:
         if matches(src, left) and matches(dst, right):
             return f"rule: {left} !-> {right}"
     for rule in rules.only:
-        if not matches(dst, rule.target) or matches(src, rule.target):
-            continue
-        if rule.applies_to and not any(matches(src, scope) for scope in rule.applies_to):
-            continue
-        if not any(matches(src, allowed) for allowed in rule.allowed_from):
+        if _breaks(rule, src, dst):
             why = f" ({rule.why})" if rule.why else ""
             return f"only {', '.join(rule.allowed_from)} may import {rule.target}{why}"
     return None
+
+
+def _breaks(rule: OnlyRule, src: str, dst: str) -> bool:
+    """Whether `src` importing `dst` crosses into a target that only named layers may import."""
+    if not matches(dst, rule.target) or matches(src, rule.target):
+        return False  # not an import of the target, or the target importing itself
+    governed = not rule.applies_to or any(matches(src, scope) for scope in rule.applies_to)
+    return governed and not any(matches(src, allowed) for allowed in rule.allowed_from)
 
 
 def _finding(src: str, edge: Edge, reason: str) -> Finding:

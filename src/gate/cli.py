@@ -7,7 +7,8 @@ import sys
 from pathlib import Path
 
 from . import baseline, dependencies, files, gaps, init, rules, runner, todo
-from .config import ConfigError, load
+from .config import load
+from .settings import ConfigError
 
 OK, FAILED, USAGE = 0, 1, 2
 

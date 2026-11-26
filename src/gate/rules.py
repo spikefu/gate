@@ -13,6 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .config import Config
+from .settings import OnlyRule
 
 START = "<!-- gate:rules:start -->"
 END = "<!-- gate:rules:end -->"
@@ -113,12 +114,14 @@ def _boundaries(config: Config) -> list[str]:
         out.append("- Modules must not import each other in a loop. Type-only imports, and imports inside a function, "
                    "do not count.")
     out += [f"- `{left}` must not import `{right}`." for left, right in b.forbid]
-    for rule in b.only:
-        allowed = ", ".join(f"`{a}`" for a in rule.allowed_from)
-        scope = f" (applies to code under {', '.join(f'`{s}`' for s in rule.applies_to)})" if rule.applies_to else ""
-        why = f" {rule.why.rstrip('.')}." if rule.why else ""
-        out.append(f"- Only {allowed} may import `{rule.target}`{scope}.{why}")
-    return out
+    return out + [_only(rule) for rule in b.only]
+
+
+def _only(rule: OnlyRule) -> str:
+    allowed = ", ".join(f"`{a}`" for a in rule.allowed_from)
+    scope = f" (applies to code under {', '.join(f'`{s}`' for s in rule.applies_to)})" if rule.applies_to else ""
+    why = f" {rule.why.rstrip('.')}." if rule.why else ""
+    return f"- Only {allowed} may import `{rule.target}`{scope}.{why}"
 
 
 _MARKERS = {

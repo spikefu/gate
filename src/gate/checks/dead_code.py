@@ -33,7 +33,7 @@ from pathlib import Path
 from ..context import Context
 from ..files import is_test, matches
 from ..findings import Finding
-from ..lang.import_graph import edges_for
+from ..lang.import_graph import Edge, edges_for
 from ..lang.js_resolve import EXTS as JS_EXTS
 from ..lang.js_resolve import Resolver
 
@@ -51,25 +51,34 @@ _KIND = {"def": "function", "const": "constant", "let": "variable", "var": "vari
 
 def run(ctx: Context) -> list[Finding]:
     cfg = ctx.config.dead_code
-    judged = [rel for rel in ctx.files if _judgeable(rel) and not any(matches(rel, p) for p in cfg.exclude)]
-    if not judged:
+    candidates = [rel for rel in ctx.files if _judgeable(rel, cfg.exclude)]
+    if not candidates:
         return []
     texts = _texts(ctx)
-    imported, forwarded = _imported_and_forwarded(ctx, texts)
     uses = Counter(word for text in texts.values() for word in _WORD.findall(text))
     findings = []
-    for rel in sorted(judged):
-        if rel not in imported or rel in forwarded or rel not in texts:
-            continue
+    for rel in sorted(set(candidates) & _judged_modules(ctx, texts)):
         for kind, name, line in _definitions(rel, texts[rel]):
             if uses[name] == 1 and name not in cfg.ignore:
                 findings.append(_finding(rel, kind, name, line, cfg.severity))
     return findings
 
 
-def _judgeable(rel: str) -> bool:
-    suffix = Path(rel).suffix
-    return (suffix == ".py" or suffix in JS_EXTS) and not rel.endswith(".d.ts") and not is_test(rel)
+def _judged_modules(ctx: Context, texts: dict[str, str]) -> set[str]:
+    """Modules whose definitions this repo alone decides: imported by something, and not forwarded wholesale."""
+    graph = edges_for(ctx.root, ctx.repo_files, [rel for rel in texts if _is_module(rel)])
+    imported = {edge.target for edges in graph.values() for edge in edges}
+    return (imported & set(texts)) - _forwarded(ctx, texts, graph)
+
+
+def _is_module(rel: str) -> bool:
+    return rel.endswith(".py") or Path(rel).suffix in JS_EXTS
+
+
+def _judgeable(rel: str, exclude: tuple[str, ...]) -> bool:
+    if not _is_module(rel) or rel.endswith(".d.ts") or is_test(rel):
+        return False
+    return not any(matches(rel, pattern) for pattern in exclude)
 
 
 def _texts(ctx: Context) -> dict[str, str]:
@@ -89,21 +98,23 @@ def _texts(ctx: Context) -> dict[str, str]:
     return out
 
 
-def _imported_and_forwarded(ctx: Context, texts: dict[str, str]) -> tuple[set[str], set[str]]:
-    """Modules some other file imports, and modules re-exported wholesale."""
-    sources = [rel for rel in texts if Path(rel).suffix == ".py" or Path(rel).suffix in JS_EXTS]
-    graph = edges_for(ctx.root, ctx.repo_files, sources)
-    imported = {edge.target for edges in graph.values() for edge in edges}
-    forwarded: set[str] = set()
+def _forwarded(ctx: Context, texts: dict[str, str], graph: dict[str, list[Edge]]) -> set[str]:
+    """Modules re-exported wholesale, whose names leave by a route this check cannot follow."""
     resolver = Resolver(ctx.root, ctx.repo_files)
-    for rel in sources:
-        if rel.endswith(".py"):
-            starred = {match.group(1) for match in _PY_STAR.finditer(texts[rel])}
-            forwarded |= {edge.target for edge in graph.get(rel, ()) if any(f"from {s} import" in edge.spec for s in starred)}
-        else:
-            targets = (resolver.resolve(rel, match.group(1)) for match in _JS_STAR.finditer(texts[rel]))
-            forwarded |= {target for target in targets if target}
-    return imported, forwarded
+    out: set[str] = set()
+    for rel in graph:
+        out |= _python_stars(texts[rel], graph[rel]) if rel.endswith(".py") else _js_stars(rel, texts[rel], resolver)
+    return out
+
+
+def _python_stars(text: str, edges: list[Edge]) -> set[str]:
+    starred = {match.group(1) for match in _PY_STAR.finditer(text)}
+    return {edge.target for edge in edges if any(f"from {s} import" in edge.spec for s in starred)}
+
+
+def _js_stars(rel: str, text: str, resolver: Resolver) -> set[str]:
+    targets = (resolver.resolve(rel, match.group(1)) for match in _JS_STAR.finditer(text))
+    return {target for target in targets if target}
 
 
 def _definitions(rel: str, text: str) -> list[tuple[str, str, int]]:

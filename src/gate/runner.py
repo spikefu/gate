@@ -21,9 +21,10 @@ from .checks import (
     test_integrity,
     toolchain,
 )
-from .config import PLANNED, TOOLCHAIN, Config
+from .config import PLANNED, Config
 from .context import Context
 from .findings import Finding, Report, Skipped
+from .settings import TOOLCHAIN
 
 _STRUCTURAL: dict[str, Callable[[Context], list[Finding]]] = {
     "syntax": syntax.run,

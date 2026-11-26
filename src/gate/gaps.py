@@ -15,9 +15,10 @@ from pathlib import Path
 
 from . import baseline, dependencies, files, propose, rules
 from .checks import complexity, toolchain
-from .config import TOOLCHAIN, Config
+from .config import Config
 from .context import Context
 from .files import matches
+from .settings import TOOLCHAIN
 
 
 @dataclass(frozen=True)

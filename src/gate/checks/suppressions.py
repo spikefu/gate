@@ -18,9 +18,9 @@ import re
 import tokenize
 from pathlib import Path
 
-from ..config import SUPPRESSION_KINDS as KINDS
 from ..context import Context
 from ..findings import FAIL, Finding
+from ..settings import SUPPRESSION_KINDS as KINDS
 
 MAX_BYTES = 1_000_000
 MAX_LISTED = 10

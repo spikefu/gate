@@ -118,16 +118,24 @@ def _pyproject(text: str) -> list[str]:
         data = tomllib.loads(text)
     except tomllib.TOMLDecodeError:
         return []
+    names = [_python_name(r) for r in [*_standard_requirements(data), *_poetry_packages(data)]]
+    return [name for name in names if name]
+
+
+def _standard_requirements(data: dict) -> list[str]:
+    """Requirement strings from the standard tables: the project's own, its extras, its groups, its build."""
     project = data.get("project", {})
-    requirements = [*project.get("dependencies", []), *data.get("build-system", {}).get("requires", [])]
-    for group in [*project.get("optional-dependencies", {}).values(), *data.get("dependency-groups", {}).values()]:
-        requirements += [r for r in group if isinstance(r, str)]
-    names = [_python_name(r) for r in requirements if isinstance(r, str)]
+    groups = [project.get("dependencies", []), data.get("build-system", {}).get("requires", []),
+              *project.get("optional-dependencies", {}).values(), *data.get("dependency-groups", {}).values()]
+    return [r for group in groups for r in group if isinstance(r, str)]
+
+
+def _poetry_packages(data: dict) -> list[str]:
+    """Package names from Poetry's tables, where the name is the key. `python` there is the interpreter."""
     poetry = data.get("tool", {}).get("poetry", {})
     tables = [poetry.get("dependencies", {}), poetry.get("dev-dependencies", {}),
               *(g.get("dependencies", {}) for g in poetry.get("group", {}).values())]
-    names += [_python_name(key) for table in tables for key in table if key.lower() != "python"]
-    return [name for name in names if name]
+    return [key for table in tables for key in table if key.lower() != "python"]
 
 
 def _requirements(text: str) -> list[str]:
@@ -148,13 +156,19 @@ def _go_mod(text: str) -> list[str]:
             in_block = True
         elif in_block and stripped == ")":
             in_block = False
-        elif "// indirect" in stripped:
-            continue  # pulled in by something else, not chosen here
-        elif in_block and stripped and not stripped.startswith("//"):
-            names.append(stripped.split()[0])
-        elif stripped.startswith("require ") and len(stripped.split()) >= 3:
-            names.append(stripped.split()[1])
+        else:
+            names += _go_module(stripped, in_block)
     return names
+
+
+def _go_module(line: str, in_block: bool) -> list[str]:
+    """The module one go.mod line requires directly, if it requires one."""
+    words = line.split()
+    if "// indirect" in line or not words or words[0].startswith("//"):
+        return []  # pulled in by something else, blank, or a comment
+    if in_block:
+        return [words[0]]
+    return [words[1]] if words[0] == "require" and len(words) >= 3 else []
 
 
 def _cargo(text: str) -> list[str]:

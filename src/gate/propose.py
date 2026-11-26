@@ -80,8 +80,13 @@ def _rules(parts: list[str], edges: set[tuple[str, str]], include_unrelated: boo
     foundations = {b for _, b in edges} - importers
     pairs = sorted((b, a) for a, b in edges if (b, a) not in edges)
     if include_unrelated:
-        pairs += sorted(
-            (a, b) for a in parts for b in parts
-            if a != b and (a, b) not in edges and (b, a) not in edges and b not in foundations
-        )
+        pairs += _unrelated(parts, edges, foundations)
     return [f"{a} !-> {b}" for a, b in pairs]
+
+
+def _unrelated(parts: list[str], edges: set[tuple[str, str]], foundations: set[str]) -> list[tuple[str, str]]:
+    """Pairs of parts with no import either way today, which a rule can keep apart."""
+    return sorted(
+        (a, b) for a in parts for b in parts
+        if a != b and (a, b) not in edges and (b, a) not in edges and b not in foundations
+    )

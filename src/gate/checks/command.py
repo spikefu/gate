@@ -7,9 +7,9 @@ Covers test suites (`[tests.<name>]`) and anything else with a script
 from __future__ import annotations
 
 from .. import proc
-from ..config import Command
 from ..context import Context
 from ..findings import Finding
+from ..settings import Command
 
 
 def run(ctx: Context, command: Command) -> list[Finding]:
