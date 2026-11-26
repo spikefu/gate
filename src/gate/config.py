@@ -27,7 +27,7 @@ from .settings import (
 )
 
 STRUCTURAL = ("syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "dead-code",
-              "new-dependencies", "change-size")
+              "new-dependencies", "change-size", "mutable-state")
 # Designed but not built yet. Accepted in config so a file written against the
 # design keeps loading; a profile that names one reports it as skipped.
 PLANNED = ("test-quality", "docs", "scope", "imports")
@@ -35,7 +35,7 @@ PLANNED = ("test-quality", "docs", "scope", "imports")
 OPTIONAL = ("coverage",)
 
 _TOP_LEVEL = {"version", "files", "profiles", "syntax", "complexity", "size", "boundaries",
-              "suppressions", "test-integrity", "duplication", "dead-code", "change-size", "toolchain", "tests", "command", "rules", *OPTIONAL, *PLANNED}
+              "suppressions", "test-integrity", "duplication", "dead-code", "change-size", "mutable-state", "toolchain", "tests", "command", "rules", *OPTIONAL, *PLANNED}
 
 
 @dataclass(frozen=True)

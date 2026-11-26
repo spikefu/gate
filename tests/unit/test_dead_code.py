@@ -6,8 +6,8 @@ from gate.checks import dead_code
 USES = 'import { used } from "./lib"\nexport const app = used()\n'
 
 
-def found(repo, selected=None):
-    return {(f.path, f.symbol) for f in dead_code.run(repo.context(selected))}
+def found(repo, selected=None, rule="unused"):
+    return {(f.path, f.symbol) for f in dead_code.run(repo.context(selected)) if f.rule == rule}
 
 
 def test_an_export_nothing_refers_to_is_reported_with_its_kind_and_line(repo):
@@ -105,3 +105,30 @@ def test_recording_a_finding_in_the_baseline_does_not_make_it_look_used(repo):
     repo.write("src/app.ts", USES)
     baseline.save(repo.root, baseline.current(dead_code.run(repo.context())))
     assert found(repo) == {("src/lib.ts", "abandoned")}, "its name in .gate/baseline.json is not a use"
+
+
+def test_an_export_only_its_own_file_uses_is_reported_as_needless(repo):
+    repo.write("src/lib.ts", "export function used() { return helper() + LIMIT }\n"
+                             "export function helper() { return 1 }\nexport const LIMIT = 2\n"
+                             "export interface Options { a: number }\nexport type Id = string\n"
+                             "export function build(o: Options): Id { return String(o.a) }\n")
+    repo.write("src/app.ts", 'import { used, build } from "./lib"\nused(); build({ a: 1 })\n')
+    assert found(repo, rule="needless-export") == {("src/lib.ts", "helper"), ("src/lib.ts", "LIMIT")}, "types are left alone"
+    (finding,) = [f for f in dead_code.run(repo.context()) if f.symbol == "helper"]
+    assert finding.key == "dead-code/needless-export:src/lib.ts::helper" and finding.line == 2
+    assert "exported but only this file uses it" in finding.message
+    assert found(repo) == set(), "used within the file, so not dead"
+
+
+def test_needless_exports_follow_the_same_guards_and_can_be_switched_off(repo):
+    repo.write("src/lib.ts", "export function used() { return helper() }\nexport function helper() { return 1 }\n")
+    repo.write("src/app/route.ts", "export const dynamic = 1\nexport function GET() { return dynamic }\n")   # nothing imports it
+    repo.write("src/app.ts", USES)
+    repo.write("pkg/core.py", "def a():\n    return b()\n\n\ndef b():\n    return 1\n")
+    repo.write("pkg/__init__.py", "from pkg.core import a\n")
+    assert found(repo, rule="needless-export") == {("src/lib.ts", "helper")}, "Python has no exports to drop"
+    repo.write("tests/lib.test.ts", "helper()\n")
+    assert found(repo, rule="needless-export") == set(), "a test using it is a use"
+    (repo.root / "tests/lib.test.ts").unlink()
+    repo.write("gate.toml", "[dead-code]\nexports = false\n")
+    assert found(repo, rule="needless-export") == set()

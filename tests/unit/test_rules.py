@@ -31,7 +31,14 @@ def test_prose_states_both_kinds_of_boundary_and_omits_the_heading_when_there_ar
     assert "- `src/domain` must not import `src/infra`." in block
     assert "- Only `src/modules` may import `src/db` (applies to code under `src`). Ports and adapters." in block
     assert "Modules must not import each other in a loop." in rules.render(config(repo)), "cycles need no configuration"
-    assert "### Boundaries" not in rules.render(config(repo, "[boundaries]\ncycles = false\n"))
+    everything_off = "[boundaries]\ncycles = false\nprivate = false\nmax_imports = 0\n"
+    assert "### Boundaries" not in rules.render(config(repo, everything_off))
+    defaults = rules.render(config(repo))
+    assert "starting with `_` is private to the folder it is in" in defaults
+    assert "is private to the folder" not in rules.render(config(repo, "[boundaries]\nprivate = false\n"))
+    assert "importing more than 15 of this repo's modules gets a warning" in defaults
+    assert "An `export` on something only its own file uses fails." in defaults
+    assert "### Shared state" in defaults and "top-level `let` or `var`, or a Python `global`" in defaults
 
 
 def test_prose_names_profiles_and_the_commands_behind_checks(repo):

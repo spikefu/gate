@@ -13,7 +13,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from .config import Config
-from .settings import ModuleRule, OnlyRule
+from .settings import Boundaries, ModuleRule, OnlyRule
 
 START = "<!-- gate:rules:start -->"
 END = "<!-- gate:rules:end -->"
@@ -47,6 +47,7 @@ def render(config: Config) -> str:
         *_dependencies(config),
         *_change_size(config),
         *_coverage(config),
+        *_mutable_state(config),
         "",
         "### Checks",
         "",
@@ -108,14 +109,26 @@ def _limits(config: Config) -> list[str]:
 
 def _boundaries(config: Config) -> list[str]:
     b = config.boundaries
-    if not b.forbid and not b.only and not b.modules and not b.cycles:
+    if not (b.forbid or b.only or b.modules or b.cycles or b.private or b.max_imports):
         return []
-    out = ["", "### Boundaries", ""]
+    out = ["", "### Boundaries", "", *_undeclared(b)]
+    out += [f"- `{left}` must not import {_named(right)}." for left, right in b.forbid]
+    return out + [_only(rule) for rule in b.only] + [_module(rule) for rule in b.modules]
+
+
+def _undeclared(b: Boundaries) -> list[str]:
+    """The boundary rules that hold without the repo declaring anything."""
+    out = []
     if b.cycles:
         out.append("- Modules must not import each other in a loop. Type-only imports, and imports inside a function, "
                    "do not count.")
-    out += [f"- `{left}` must not import {_named(right)}." for left, right in b.forbid]
-    return out + [_only(rule) for rule in b.only] + [_module(rule) for rule in b.modules]
+    if b.private:
+        out.append("- A Python name or module starting with `_` is private to the folder it is in. Do not import it "
+                   "from anywhere else.")
+    if b.max_imports:
+        out.append(f"- A file importing more than {b.max_imports} of this repo's modules gets a warning: unless it "
+                   "is where the program is wired together, split it.")
+    return out
 
 
 def _module(rule: ModuleRule) -> str:
@@ -183,6 +196,8 @@ def _dead_code(config: Config) -> list[str]:
         "",
         "- Do not leave code nothing uses. A function, class, constant or type whose name appears nowhere else "
         "in the repo fails.",
+        *(["- Export only what another file uses. An `export` on something only its own file uses fails."]
+          if config.dead_code.exports else []),
         "- When you change approach, delete what the first attempt left behind. Do not keep it \"in case\".",
     ]
 
@@ -225,6 +240,19 @@ def _coverage(config: Config) -> list[str]:
         "a change adds.",
         "- Write tests that exercise the new lines. Do not add coverage exclusions, and do not delete code paths "
         "to raise the figure.",
+    ]
+
+
+def _mutable_state(config: Config) -> list[str]:
+    if not any("mutable-state" in checks for checks in config.profiles.values()):
+        return []
+    return [
+        "",
+        "### Shared state",
+        "",
+        "- Do not add module-level variables that code reassigns: a top-level `let` or `var`, or a Python `global`. "
+        "Adding one fails.",
+        "- Pass the value in, return it, or keep it in an object with a clear owner.",
     ]
 
 

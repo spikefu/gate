@@ -12,7 +12,7 @@ exclude = ["**/node_modules/**", "**/dist/**", "**/build/**", "**/*.generated.*"
 
 [profiles]
 fast = ["syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "dead-code", "new-dependencies",
-        "change-size", "lint"]   # agent hook: seconds, changed files
+        "change-size", "mutable-state", "lint"]   # agent hook: seconds, changed files
 full = ["syntax", "complexity", "size", "boundaries", "suppressions", "lint",
         "typecheck", "unit", "integration", "test-quality", "docs"]    # CI and pre-merge
 default = "fast"
@@ -59,6 +59,7 @@ exclude = []              # globs left out, e.g. generated clients
 [dead-code]
 # A top-level definition whose name appears nowhere else in the repo.
 severity = "fail"         # the default; or "warn"
+exports = true            # the default: also report a JS/TS export only its own file uses
 ignore = []               # names used in ways the text does not show
 exclude = []              # globs left out, e.g. a published package's public API
 
@@ -73,6 +74,8 @@ severity = "fail"         # the default; "warn" if CI compares against a long-li
 
 [boundaries]
 cycles = true             # the default: modules importing each other in a loop are findings
+private = true            # the default: Python `_private` names stay in the folder that owns them
+max_imports = 15          # the default: warn past this many of the repo's own modules; 0 = off
 
 # Forbidden direction: the left side may not import the right side.
 # The right side can also be an outside package or built-in module, as `pkg:<name>`:

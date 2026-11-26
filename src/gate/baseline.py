@@ -21,7 +21,7 @@ from pathlib import Path
 
 from .findings import FAIL, Finding
 
-BASELINABLE = ("complexity", "size", "boundaries", "suppressions", "duplication", "dead-code")
+BASELINABLE = ("complexity", "size", "boundaries", "suppressions", "duplication", "dead-code", "mutable-state")
 FILE = ".gate/baseline.json"
 
 Value = float | None

@@ -84,10 +84,11 @@ moves. The baseline matches on it.
 | `boundaries` | `a !-> b` forbidden imports, "only X may import Y" rules for ports and adapters, both also against outside packages (`pkg:name`), module entry points, and import cycles |
 | `suppressions` | Markers that switch a check off: lint and type ignores, skipped tests, coverage exclusions |
 | `duplication` | Blocks of code identical to code elsewhere in the repo, apart from layout and comments |
-| `dead-code` | Top-level definitions whose name appears nowhere else in the repo |
+| `dead-code` | Top-level definitions whose name appears nowhere else in the repo, and JS/TS exports only their own file uses |
 | `new-dependencies` | A package declared in a manifest that nobody has approved |
 | `change-size` | On a `--changed` run: the change adds more non-test code than a person can review well. Warns |
 | `coverage` | On a `--changed` run: the tests run too few of the lines the change adds. Needs the repo's coverage report |
+| `mutable-state` | Module-level variables that code reassigns: top-level `let`/`var`, Python `global` |
 | `test-integrity` | On a `--changed` run: the change leaves fewer tests, or fewer assertions, than the base ref had |
 | `lint`, `typecheck`, `format`, `security`, `deps` | The repo's own command, or the first installed tool for each language present |
 | `[tests.<name>]` | The repo's own test commands, judged by exit code |
@@ -289,6 +290,35 @@ something `__init__` exports or a submodule of the same name; the text cannot
 say which, so it is read as going through the entry. `from pkg.name import x`
 and `import pkg.name` name the submodule and are findings.
 
+### Encapsulation and coupling without configuration
+
+Three rules rest on conventions wide enough to assume, so they are on without
+anything being declared.
+
+- **Private names (Python).** A module or name starting with `_` belongs to
+  the folder it sits in. Importing it from another folder is a finding;
+  inside the same package it is shared freely. `[boundaries] private = false`
+  switches it off.
+- **Needless exports (JS/TS).** An exported function, class, constant or enum
+  that only its own file mentions should not be exported: the module's
+  surface should be what others rely on. It is part of `dead-code` and under
+  the same guards. Types and interfaces are left alone, because a compiler
+  writing declaration files can require one to be exported that nobody
+  imports by name. `[dead-code] exports = false` switches it off.
+- **Import fan-out.** A file importing more than 15 of the repo's own modules
+  gets a warning. It never fails: the place a program is wired together is
+  long on imports for a good reason. `[boundaries] max_imports` sets the
+  figure, and 0 switches it off.
+
+### Shared mutable state
+
+A function that reads or writes a module-level variable gives different
+results depending on what ran before it. `mutable-state` counts what the
+syntax makes certain: a top-level `let` or `var` in JS/TS (a `const` cannot
+be reassigned), and each variable a Python `global` statement rebinds. One
+finding per file carries the count, so the baseline is a ratchet. Mutating a
+top-level object in place is not seen, and test files are exempt.
+
 ### Outside packages in boundary rules
 
 A rule's target can be `pkg:<name>`: an outside package or a built-in module.
@@ -326,8 +356,8 @@ worst first, and is meant to be committed.
   first. Findings under one key are paired with its recorded values worst with
   worst, and any left over fail.
 
-- Only `complexity`, `size`, `boundaries`, `suppressions`, `duplication` and
-  `dead-code` can be baselined. A failing test
+- Only `complexity`, `size`, `boundaries`, `suppressions`, `duplication`,
+  `dead-code` and `mutable-state` can be baselined. A failing test
   suite or linter is never grandfathered.
 - A baselined finding whose value gets worse fails again, and its message
   says what the baseline allows.

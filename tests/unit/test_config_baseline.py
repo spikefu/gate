@@ -22,7 +22,7 @@ def test_missing_config_gives_the_documented_defaults(tmp_path):
     assert (config.complexity.ccn_warn, config.complexity.ccn_fail) == (10, 15)
     assert (config.complexity.max_function_lines, config.complexity.max_parameters) == (80, 5)
     assert (config.size.warn, config.size.fail, config.size.test_fail) == (300, 500, 1000)
-    assert config.checks_for(None) == ("fast", ["syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "dead-code", "new-dependencies", "change-size", "lint"])
+    assert config.checks_for(None) == ("fast", ["syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "dead-code", "new-dependencies", "change-size", "mutable-state", "lint"])
 
 
 @pytest.mark.parametrize("text, fragment", [
@@ -45,6 +45,9 @@ def test_missing_config_gives_the_documented_defaults(tmp_path):
     ("[boundaries]\ncycle = false\n", "cycles"),
     ('[boundaries]\nforbid = ["pkg:express !-> src"]\n', "cannot be the importer"),
     ('[[boundaries.module]]\nentry = ["index.ts"]\n', "needs 'path'"),
+    ('[boundaries]\nprivate = "yes"\n', "private"),
+    ("[boundaries]\nmax_imports = -1\n", "max_imports"),
+    ('[dead-code]\nexports = "no"\n', "exports"),
     ('[[boundaries.module]]\npath = "src/**"\n', "needs 'path'"),
     ('[[boundaries.module]]\npath = "src/a"\nentries = ["x"]\n', "needs 'path'"),
     ("[coverage]\nmin_changed_percent = 120\n", "coverage"),

@@ -15,6 +15,7 @@ from ..findings import Finding
 from ..lang import cycles
 from ..lang.import_graph import Edge, edges_for, externals_for, matches_package
 from ..settings import Boundaries, OnlyRule
+from . import encapsulation
 
 PACKAGE = "pkg:"
 
@@ -22,14 +23,17 @@ PACKAGE = "pkg:"
 def run(ctx: Context) -> list[Finding]:
     rules = ctx.config.boundaries
     findings: list[Finding] = []
+    graph = edges_for(ctx.root, ctx.repo_files, ctx.code_files())
     if rules.forbid or rules.only or rules.modules:
-        graph = edges_for(ctx.root, ctx.repo_files, ctx.code_files())
         for src, edges in graph.items():
             for edge in edges:
                 reason = _violation(ctx, src, edge.target) or _reaches_inside(rules, src, edge)
                 if reason:
                     findings.append(_finding(src, edge, reason))
         findings += _outside(ctx)
+    if rules.private:
+        findings += encapsulation.private_imports(graph)
+    findings += encapsulation.fan_out(graph, rules.max_imports)
     if rules.cycles:
         findings += _cycles(ctx)
     return findings

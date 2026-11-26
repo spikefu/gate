@@ -14,6 +14,8 @@ Run `gate check --changed` before you finish. It must pass.
 ### Boundaries
 
 - Modules must not import each other in a loop. Type-only imports, and imports inside a function, do not count.
+- A Python name or module starting with `_` is private to the folder it is in. Do not import it from anywhere else.
+- A file importing more than 15 of this repo's modules gets a warning: unless it is where the program is wired together, split it.
 - `src/gate/checks` must not import `src/gate/runner.py`.
 - `src/gate/checks` must not import `src/gate/cli.py`.
 - `src/gate/lang` must not import `src/gate/checks`.
@@ -31,6 +33,7 @@ Run `gate check --changed` before you finish. It must pass.
 ### Dead code
 
 - Do not leave code nothing uses. A function, class, constant or type whose name appears nowhere else in the repo fails.
+- Export only what another file uses. An `export` on something only its own file uses fails.
 - When you change approach, delete what the first attempt left behind. Do not keep it "in case".
 
 ### Change size
@@ -38,10 +41,15 @@ Run `gate check --changed` before you finish. It must pass.
 - Keep each change small enough to review. Past 400 added lines of non-test code in one uncommitted change, gate warns.
 - When it does, stop at the next natural point and say so in your report. Do not carry on, and do not commit on your own to reset the count.
 
+### Shared state
+
+- Do not add module-level variables that code reassigns: a top-level `let` or `var`, or a Python `global`. Adding one fails.
+- Pass the value in, return it, or keep it in an object with a clear owner.
+
 ### Checks
 
-- `gate check --profile fast` (default): syntax, complexity, size, boundaries, suppressions, test-integrity, duplication, dead-code, change-size, lint.
-- `gate check --profile full`: syntax, complexity, size, boundaries, suppressions, test-integrity, duplication, dead-code, change-size, lint, typecheck, unit, integration.
+- `gate check --profile fast` (default): syntax, complexity, size, boundaries, suppressions, test-integrity, duplication, dead-code, change-size, mutable-state, lint.
+- `gate check --profile full`: syntax, complexity, size, boundaries, suppressions, test-integrity, duplication, dead-code, change-size, mutable-state, lint, typecheck, unit, integration.
 - `lint` runs `ruff check .`.
 - `typecheck` runs `mypy`.
 - `unit` runs `pytest -q tests/unit`.

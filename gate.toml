@@ -19,5 +19,5 @@ forbid = [
 ]
 
 [profiles]
-fast = ["syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "dead-code", "change-size", "lint"]
-full = ["syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "dead-code", "change-size", "lint", "typecheck", "unit", "integration"]
+fast = ["syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "dead-code", "change-size", "mutable-state", "lint"]
+full = ["syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "dead-code", "change-size", "mutable-state", "lint", "typecheck", "unit", "integration"]

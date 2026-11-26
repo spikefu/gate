@@ -74,6 +74,8 @@ class Duplication:
 @dataclass(frozen=True)
 class DeadCode:
     severity: str = "fail"
+    # Also report a JS/TS export that only its own file uses.
+    exports: bool = True
     # Names used in ways the repo's text does not show (built from strings, called by a framework).
     ignore: tuple[str, ...] = ()
     exclude: tuple[str, ...] = ()
@@ -136,6 +138,10 @@ class Boundaries:
     forbid: tuple[tuple[str, str], ...] = ()
     only: tuple[OnlyRule, ...] = ()
     modules: tuple[ModuleRule, ...] = ()
+    # Python: a `_private` module or name may be imported only from the folder that owns it.
+    private: bool = True
+    # Warn when a file imports more of the repo's own modules than this; 0 switches it off.
+    max_imports: int = 15
     # Modules importing each other in a loop are findings.
     cycles: bool = True
 
@@ -208,12 +214,20 @@ def read_boundaries(table: dict) -> Boundaries:
             raise ConfigError("[[boundaries.only]] needs 'target' and 'allowed_from'")
         only.append(OnlyRule(o["target"], tuple(o["allowed_from"]), o.get("why", ""),
                              tuple(o.get("applies_to", ()))))
-    unknown = set(table) - {"forbid", "only", "module", "cycles"}
-    if unknown or not isinstance(table.get("cycles", True), bool):
-        raise ConfigError("[boundaries]: keys are forbid, only, module and cycles (true or false); "
-                          f"got {', '.join(sorted(table))}")
+    cycles, private, limit = _boundary_switches(table)
     modules = tuple(_module_rule(m) for m in table.get("module", []))
-    return Boundaries(tuple(forbid), tuple(only), modules, table.get("cycles", True))
+    return Boundaries(tuple(forbid), tuple(only), modules, private, limit, cycles)
+
+
+def _boundary_switches(table: dict) -> tuple[bool, bool, int]:
+    """The settings of the rules that need no declaration: (cycles, private, max_imports)."""
+    cycles, private, limit = table.get("cycles", True), table.get("private", True), table.get("max_imports", 15)
+    unknown = set(table) - {"forbid", "only", "module", "cycles", "private", "max_imports"}
+    well_typed = isinstance(cycles, bool) and isinstance(private, bool) and isinstance(limit, int) and limit >= 0
+    if unknown or not well_typed:
+        raise ConfigError("[boundaries]: keys are forbid, only, module, cycles and private (true or false) and "
+                          f"max_imports (a number); got {', '.join(sorted(table))}")
+    return cycles, private, limit
 
 
 def _module_rule(table: dict) -> ModuleRule:
@@ -243,8 +257,8 @@ def read_duplication(table: dict) -> Duplication:
 def read_dead_code(table: dict) -> DeadCode:
     cfg = read_fields(DeadCode, {**table, "ignore": tuple(table.get("ignore", ())),
                              "exclude": tuple(table.get("exclude", ()))}, "dead-code")
-    if cfg.severity not in ("fail", "warn"):
-        raise ConfigError('[dead-code]: severity must be "fail" or "warn"')
+    if cfg.severity not in ("fail", "warn") or not isinstance(cfg.exports, bool):
+        raise ConfigError('[dead-code]: severity must be "fail" or "warn", and exports true or false')
     return cfg
 
 

@@ -36,6 +36,7 @@ from ..findings import Finding
 from ..lang.import_graph import Edge, edges_for
 from ..lang.js_resolve import EXTS as JS_EXTS
 from ..lang.js_resolve import Resolver
+from ..settings import DeadCode
 
 MAX_BYTES = 1_000_000
 
@@ -56,12 +57,30 @@ def run(ctx: Context) -> list[Finding]:
         return []
     texts = _texts(ctx)
     uses = Counter(word for text in texts.values() for word in _WORD.findall(text))
+    judged = sorted(set(candidates) & _judged_modules(ctx, texts))
+    return [finding for rel in judged for finding in _in_file(rel, texts[rel], uses, cfg)]
+
+
+def _in_file(rel: str, text: str, uses: Counter[str], cfg: DeadCode) -> list[Finding]:
+    here = Counter(_WORD.findall(text))
     findings = []
-    for rel in sorted(set(candidates) & _judged_modules(ctx, texts)):
-        for kind, name, line in _definitions(rel, texts[rel]):
-            if uses[name] == 1 and name not in cfg.ignore:
-                findings.append(_finding(rel, kind, name, line, cfg.severity))
+    for kind, name, line in _definitions(rel, text):
+        if name in cfg.ignore:
+            continue
+        if uses[name] == 1:
+            findings.append(_finding(rel, kind, name, line, cfg.severity))
+        elif cfg.exports and _needlessly_exported(rel, kind, uses[name], here[name]):
+            findings.append(_export_finding(rel, kind, name, line, cfg.severity))
     return findings
+
+
+def _needlessly_exported(rel: str, kind: str, everywhere: int, here: int) -> bool:
+    """An export nothing outside its file mentions.
+
+    Types are left alone: a compiler that writes declaration files can require a type to be
+    exported because an exported function mentions it, even though nobody imports it by name.
+    """
+    return not rel.endswith(".py") and kind not in ("interface", "type") and everywhere == here
 
 
 def _judged_modules(ctx: Context, texts: dict[str, str]) -> set[str]:
@@ -134,6 +153,16 @@ def _decorated(text: str, line: int) -> bool:
     while above and not above[-1].strip():
         above.pop()
     return bool(above) and above[-1].lstrip().startswith("@")
+
+
+def _export_finding(rel: str, kind: str, name: str, line: int, severity: str) -> Finding:
+    kind = _KIND.get(kind, kind.rstrip("*"))
+    return Finding(
+        check="dead-code", rule="needless-export", key=f"dead-code/needless-export:{rel}::{name}", path=rel, line=line,
+        symbol=name, severity=severity,
+        message=f"{kind} `{name}` is exported but only this file uses it: drop the `export`, so the module "
+                "exposes only what others rely on",
+    )
 
 
 def _finding(rel: str, kind: str, name: str, line: int, severity: str) -> Finding:

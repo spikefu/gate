@@ -95,12 +95,13 @@ agent change `gate.toml`, a limit, or the baseline by itself.
 | `size` | file line count, a longer limit for test files, and per-glob overrides |
 | `suppressions` | any added marker that switches a check off: lint and type ignores, skipped tests, coverage exclusions |
 | `duplication` | a block of 10 or more lines identical to code elsewhere in the repo |
-| `dead-code` | a top-level definition whose name appears nowhere else in the repo |
+| `dead-code` | a top-level definition whose name appears nowhere else in the repo; a JS/TS export only its own file uses |
 | `new-dependencies` | a package in a manifest that nobody has approved with `gate dependencies --accept` |
 | `change-size` | nothing by default: on `--changed` it warns when a change adds over 400 lines of non-test code |
 | `coverage` | on `--changed`: the tests run under 80% of the lines the change adds. Opt-in: needs `[coverage] report` |
+| `mutable-state` | an added module-level variable that code reassigns (top-level `let`/`var`, Python `global`) |
 | `test-integrity` | on `--changed`: the change leaves the repo with fewer tests or fewer assertions |
-| `boundaries` | `a !-> b` rules and "only X may import Y" rules, against folders or outside packages (`src/domain !-> pkg:fs`); module entry points; import cycles |
+| `boundaries` | `a !-> b` rules and "only X may import Y" rules, against folders or outside packages (`src/domain !-> pkg:fs`); module entry points; import cycles; Python `_private` names imported from another folder |
 | `lint`, `typecheck`, `format`, `security`, `deps` | your command, or the first installed tool for the language |
 | `[tests.<name>]`, `[[command]]` | exit code of your own command |
 
