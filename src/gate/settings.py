@@ -86,6 +86,17 @@ class ChangeSize:
 
 
 @dataclass(frozen=True)
+class Coverage:
+    # Reports the repo's own test run writes: lcov or Cobertura XML.
+    reports: tuple[str, ...] = ()
+    # Of the lines a change adds, the share the tests must run.
+    min_changed_percent: int = 80
+    # Of all measured lines; 0 leaves the whole-repo figure unjudged.
+    min_percent: int = 0
+    severity: str = "fail"
+
+
+@dataclass(frozen=True)
 class OnlyRule:
     target: str
     allowed_from: tuple[str, ...]
@@ -201,6 +212,16 @@ def read_change_size(table: dict) -> ChangeSize:
     cfg = read_fields(ChangeSize, table, "change-size")
     if cfg.severity not in ("fail", "warn") or cfg.max_lines < 1:
         raise ConfigError('[change-size]: severity must be "fail" or "warn", and max_lines at least 1')
+    return cfg
+
+
+def read_coverage(table: dict) -> Coverage:
+    table = dict(table)
+    report = table.pop("report", table.pop("reports", ()))
+    cfg = read_fields(Coverage, {**table, "reports": (report,) if isinstance(report, str) else tuple(report)}, "coverage")
+    in_range = 0 <= cfg.min_changed_percent <= 100 and 0 <= cfg.min_percent <= 100
+    if cfg.severity not in ("fail", "warn") or not in_range:
+        raise ConfigError('[coverage]: severity must be "fail" or "warn", and percentages between 0 and 100')
     return cfg
 
 

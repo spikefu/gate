@@ -87,6 +87,7 @@ moves. The baseline matches on it.
 | `dead-code` | Top-level definitions whose name appears nowhere else in the repo |
 | `new-dependencies` | A package declared in a manifest that nobody has approved |
 | `change-size` | On a `--changed` run: the change adds more non-test code than a person can review well. Warns |
+| `coverage` | On a `--changed` run: the tests run too few of the lines the change adds. Needs the repo's coverage report |
 | `test-integrity` | On a `--changed` run: the change leaves fewer tests, or fewer assertions, than the base ref had |
 | `lint`, `typecheck`, `format`, `security`, `deps` | The repo's own command, or the first installed tool for each language present |
 | `[tests.<name>]` | The repo's own test commands, judged by exit code |
@@ -198,6 +199,33 @@ editing files; a blocked agent would only try to shrink the diff. Committing
 resets the count, which is why the rules tell agents not to commit on their
 own to get past it. The Claude Code Stop hook shows this warning to the
 person even though the gate passed; other warnings do not interrupt.
+
+### Coverage of changed lines
+
+A passing suite says nothing about code it does not execute, and new code is
+where that matters. A whole-repo percentage hides it: a thousand untested new
+lines barely move a large total, and the figure punishes old code nobody is
+touching. So on a `--changed` run the check asks a narrower question: of the
+lines this change adds, how many did the tests run? Below 80% fails.
+
+gate does not run tests under coverage. The repo's own test command writes a
+report, lcov or Cobertura XML, and `[coverage] report` says where. The check
+is not in a default profile because it means nothing until that is set; list
+it in a profile after the tests that write the report.
+
+- Only lines the report marks as executable count, in code files that are not
+  tests, so comments and blank lines are free.
+- A changed file missing from the report is a warning, not part of the
+  figure: it is untested or simply not measured, and the report cannot say
+  which.
+- A report older than the code it would judge is refused, and the check
+  reports itself as skipped. Its line numbers describe a different file.
+- Reports name files as their tool saw them. Each name is resolved against
+  the repo, then against the folders above the report, so a workspace
+  package's own report works.
+
+`min_percent` judges the whole-repo figure as well, on any run; it is off by
+default for the reason above.
 
 ### Test integrity
 
@@ -337,8 +365,7 @@ adapters/
 
 ## Not built yet
 
-- Checks: test quality (tests with no real assertion), coverage of the lines
-  a change touches, scope (diff
+- Checks: test quality (tests with no real assertion), scope (diff
   stays inside declared files), required READMEs, imports of symbols a module
   does not export.
 - Adapters: pre-commit, and other agent harnesses.

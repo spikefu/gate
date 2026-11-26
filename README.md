@@ -98,6 +98,7 @@ agent change `gate.toml`, a limit, or the baseline by itself.
 | `dead-code` | a top-level definition whose name appears nowhere else in the repo |
 | `new-dependencies` | a package in a manifest that nobody has approved with `gate dependencies --accept` |
 | `change-size` | nothing by default: on `--changed` it warns when a change adds over 400 lines of non-test code |
+| `coverage` | on `--changed`: the tests run under 80% of the lines the change adds. Opt-in: needs `[coverage] report` |
 | `test-integrity` | on `--changed`: the change leaves the repo with fewer tests or fewer assertions |
 | `boundaries` | `a !-> b` rules, "only X may import Y" rules, and import cycles, through relative imports, tsconfig aliases and workspace packages |
 | `lint`, `typecheck`, `format`, `security`, `deps` | your command, or the first installed tool for the language |

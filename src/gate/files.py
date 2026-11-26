@@ -7,6 +7,7 @@ ignored; the directory walk is only a fallback for folders that are not repos.
 from __future__ import annotations
 
 import os
+import re
 import subprocess
 from pathlib import Path, PurePosixPath
 
@@ -74,12 +75,45 @@ def added_lines(root: Path, base: str) -> dict[str, int]:
         if rel and added.isdigit():
             out[rel] = int(added)
     for rel in _git(root, "ls-files", "-o", "--exclude-standard", "-z") or []:
-        try:
-            with open(root / rel, "rb") as handle:
-                out[rel] = sum(1 for _ in handle)
-        except OSError:
-            continue
+        out[rel] = _line_count(root / rel)
     return out
+
+
+_HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@")
+
+
+def changed_lines(root: Path, base: str) -> dict[str, set[int]]:
+    """Per file, the numbers of the lines added or modified since `base`. An untracked file is all new."""
+    try:
+        diff = subprocess.run(["git", "-C", str(root), "diff", "-U0", "--no-renames", "--relative", "--no-color", base, "--", "."],
+                              capture_output=True, text=True, errors="replace")
+    except OSError:
+        return {}
+    out = _added_by_hunk(diff.stdout) if diff.returncode == 0 else {}
+    for rel in _git(root, "ls-files", "-o", "--exclude-standard", "-z") or []:
+        out[rel] = set(range(1, _line_count(root / rel) + 1))
+    return out
+
+
+def _added_by_hunk(diff: str) -> dict[str, set[int]]:
+    """Read a zero-context diff: each hunk header gives where its added lines start and how many there are."""
+    out: dict[str, set[int]] = {}
+    current: set[int] | None = None
+    for line in diff.splitlines():
+        if line.startswith("+++ "):
+            current = None if line[4:] == "/dev/null" else out.setdefault(line[4:].removeprefix("b/"), set())
+        elif current is not None and (hunk := _HUNK.match(line)):
+            start, count = int(hunk.group(1)), int(hunk.group(2) or 1)
+            current.update(range(start, start + count))
+    return out
+
+
+def _line_count(path: Path) -> int:
+    try:
+        with open(path, "rb") as handle:
+            return sum(1 for _ in handle)
+    except OSError:
+        return 0
 
 
 def at_ref(root: Path, ref: str, rel: str) -> str | None:

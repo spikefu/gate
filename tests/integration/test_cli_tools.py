@@ -113,3 +113,17 @@ def test_a_new_dependency_fails_until_a_person_approves_it(repo):
     assert "2 approved, 0 new, 1 approved but no longer declared" in gate(repo, "dependencies")[1]
     gate(repo, "dependencies", "--accept")
     assert "1 approved, 0 new, 0 approved but no longer declared" in gate(repo, "dependencies")[1], "approving again drops it"
+
+
+def test_coverage_runs_after_the_tests_that_write_its_report(repo):
+    # The test command writes the report; the check then judges the lines the change added.
+    write = "printf 'SF:src/a.py\\\\nDA:1,1\\\\nDA:2,0\\\\nDA:3,0\\\\nend_of_record\\\\n' > lcov.info"
+    repo.write("gate.toml", f'[tests.unit]\ncommand = "{write}"\n[coverage]\nreport = "lcov.info"\n'
+                            '[profiles]\nfast = ["unit", "coverage"]\n')
+    repo.write(".gitignore", "lcov.info\n")
+    repo.commit()
+    repo.write("src/a.py", "a = 1\nb = 2\nc = 3\n")
+    code, report = check_json(repo, "--changed")
+    (finding,) = report["findings"]
+    assert code == 1 and finding["rule"] == "changed-lines" and finding["value"] == 33.3
+    assert finding["detail"] == "src/a.py: not run: 2-3"

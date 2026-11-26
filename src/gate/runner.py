@@ -12,6 +12,7 @@ from .checks import (
     change_size,
     command,
     complexity,
+    coverage,
     dead_code,
     duplication,
     new_dependencies,
@@ -37,6 +38,7 @@ _STRUCTURAL: dict[str, Callable[[Context], list[Finding]]] = {
     "dead-code": dead_code.run,
     "new-dependencies": new_dependencies.run,
     "change-size": change_size.run,
+    "coverage": coverage.run,
 }
 
 

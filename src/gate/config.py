@@ -19,6 +19,7 @@ from .settings import (
     Command,
     Complexity,
     ConfigError,
+    Coverage,
     DeadCode,
     Duplication,
     Size,
@@ -29,10 +30,12 @@ STRUCTURAL = ("syntax", "complexity", "size", "boundaries", "suppressions", "tes
               "new-dependencies", "change-size")
 # Designed but not built yet. Accepted in config so a file written against the
 # design keeps loading; a profile that names one reports it as skipped.
-PLANNED = ("test-quality", "coverage", "docs", "scope", "imports")
+PLANNED = ("test-quality", "docs", "scope", "imports")
+# Built, but only meaningful once the repo says where its coverage report is, so not in a default profile.
+OPTIONAL = ("coverage",)
 
 _TOP_LEVEL = {"version", "files", "profiles", "syntax", "complexity", "size", "boundaries",
-              "suppressions", "test-integrity", "duplication", "dead-code", "change-size", "toolchain", "tests", "command", "rules", *PLANNED}
+              "suppressions", "test-integrity", "duplication", "dead-code", "change-size", "toolchain", "tests", "command", "rules", *OPTIONAL, *PLANNED}
 
 
 @dataclass(frozen=True)
@@ -50,6 +53,7 @@ class Config:
     duplication: Duplication = Duplication()
     dead_code: DeadCode = DeadCode()
     change_size: ChangeSize = ChangeSize()
+    coverage: Coverage = Coverage()
     toolchain: dict[str, str] = field(default_factory=dict)
     tests: dict[str, Command] = field(default_factory=dict)
     commands: dict[str, Command] = field(default_factory=dict)
@@ -63,7 +67,7 @@ class Config:
         return name, self.profiles[name]
 
     def known_checks(self) -> set[str]:
-        return {*STRUCTURAL, *TOOLCHAIN, *PLANNED, *self.tests, *self.commands}
+        return {*STRUCTURAL, *OPTIONAL, *TOOLCHAIN, *PLANNED, *self.tests, *self.commands}
 
 
 def load(path: Path | None) -> Config:
@@ -90,6 +94,7 @@ def load(path: Path | None) -> Config:
         duplication=settings.read_duplication(raw.get("duplication", {})),
         dead_code=settings.read_dead_code(raw.get("dead-code", {})),
         change_size=settings.read_change_size(raw.get("change-size", {})),
+        coverage=settings.read_coverage(raw.get("coverage", {})),
         toolchain=settings.read_toolchain(raw.get("toolchain", {})),
         tests=tests,
         commands=commands,

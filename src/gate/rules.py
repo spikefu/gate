@@ -46,6 +46,7 @@ def render(config: Config) -> str:
         *_dead_code(config),
         *_dependencies(config),
         *_change_size(config),
+        *_coverage(config),
         "",
         "### Checks",
         "",
@@ -199,6 +200,20 @@ def _change_size(config: Config) -> list[str]:
         "in one uncommitted change, gate warns.",
         "- When it does, stop at the next natural point and say so in your report. Do not carry on, and do not "
         "commit on your own to reset the count.",
+    ]
+
+
+def _coverage(config: Config) -> list[str]:
+    if not config.coverage.reports or not any("coverage" in checks for checks in config.profiles.values()):
+        return []
+    return [
+        "",
+        "### Coverage",
+        "",
+        f"- New code must be tested: the tests have to run at least {config.coverage.min_changed_percent}% of the lines "
+        "a change adds.",
+        "- Write tests that exercise the new lines. Do not add coverage exclusions, and do not delete code paths "
+        "to raise the figure.",
     ]
 
 

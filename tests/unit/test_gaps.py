@@ -118,3 +118,9 @@ def test_reports_a_repo_with_no_ci_at_all(repo):
     assert "No CI configuration was found" in message
     repo.write(".gitlab-ci.yml", "test:\n  script: gate check --profile full --strict\n")
     assert "ci" not in areas(found(repo))
+
+
+def test_reports_tests_that_run_without_changed_line_coverage(repo):
+    assert any("nothing checks that they run the code a change adds" in m for m in messages(found(repo), "unchecked"))
+    covered = COVERED.replace('"unit"]', '"unit", "coverage"]') + '[coverage]\nreport = "lcov.info"\n'
+    assert not any("code a change adds" in m for m in messages(found(repo, covered), "unchecked"))

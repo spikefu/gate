@@ -40,22 +40,33 @@ def find(ctx: Context) -> list[Gap]:
 def _unchecked(ctx: Context) -> list[Gap]:
     cfg = ctx.config
     scheduled = {check for checks in cfg.profiles.values() for check in checks}
-    out = []
-    for category in TOOLCHAIN:
-        can_run = category in cfg.toolchain or toolchain.available(ctx, category)
-        if not can_run:
-            out.append(Gap("unchecked", f"Nothing checks `{category}`: no command is configured and no tool is installed.",
-                           f"Add a `{category}` command under `[toolchain]`, or install a tool for it."))
-        elif category not in scheduled:
-            out.append(Gap("unchecked", f"`{category}` can run here but no profile includes it.",
-                           f"Add \"{category}\" to a profile."))
-    if not cfg.tests:
-        out.append(Gap("unchecked", "No test command is configured, so tests are never part of the gate.",
-                       "Add `[tests.unit]` (and `[tests.integration]`) with the repo's test commands."))
+    out = [gap for category in TOOLCHAIN if (gap := _tool_gap(ctx, category, scheduled))]
+    out += _test_gaps(ctx, scheduled)
     for name in [*cfg.tests, *cfg.commands]:
         if name not in scheduled:
             out.append(Gap("unchecked", f"`{name}` is defined but no profile runs it.", f"Add \"{name}\" to a profile."))
     return out
+
+
+def _tool_gap(ctx: Context, category: str, scheduled: set[str]) -> Gap | None:
+    if category not in ctx.config.toolchain and not toolchain.available(ctx, category):
+        return Gap("unchecked", f"Nothing checks `{category}`: no command is configured and no tool is installed.",
+                   f"Add a `{category}` command under `[toolchain]`, or install a tool for it.")
+    if category not in scheduled:
+        return Gap("unchecked", f"`{category}` can run here but no profile includes it.", f"Add \"{category}\" to a profile.")
+    return None
+
+
+def _test_gaps(ctx: Context, scheduled: set[str]) -> list[Gap]:
+    cfg = ctx.config
+    if not cfg.tests:
+        return [Gap("unchecked", "No test command is configured, so tests are never part of the gate.",
+                    "Add `[tests.unit]` (and `[tests.integration]`) with the repo's test commands.")]
+    if cfg.coverage.reports and "coverage" in scheduled:
+        return []
+    return [Gap("unchecked", "Tests run, but nothing checks that they run the code a change adds.",
+                "Have the test command write a coverage report, set `[coverage] report`, and add "
+                "\"coverage\" to a profile after the tests.")]
 
 
 # ------------------------------------------- structure nothing protects yet

@@ -110,8 +110,14 @@ timeout_seconds = 900
 globs = ["**/*.test.ts", "**/*.spec.ts", "tests/**/*.py"]
 severity = "warn"         # start as a warning; raise to "fail" once the baseline is clean
 
+# gate does not run tests under coverage; your test command does. Point this at
+# the report it writes (lcov or Cobertura XML), and list "coverage" in a profile
+# after the tests that write it.
 [coverage]
-min_percent = 0           # 0 disables
+report = "coverage/lcov.info"   # or a list of reports
+min_changed_percent = 80        # of the lines a change adds, on a --changed run
+min_percent = 0                 # of all measured lines; 0 leaves it unjudged
+severity = "fail"
 
 # ---------------------------------------------------------------- orientation
 
