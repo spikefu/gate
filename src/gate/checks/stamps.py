@@ -31,7 +31,7 @@ def _judge(ctx: Context, rule: stamp.Rule) -> list[Finding]:
         return [_finding(rule, "unreadable", f"{rule.file} is not a stamp that can be read: {error}. Make what it is for again")]
     again = f": make it again with `{recorded.remake}`" if recorded.remake else ": make it again"
     out = []
-    moved = stamp.drift(ctx.root, recorded, ctx.repo_files)
+    moved = stamp.drift(ctx.root, recorded, ctx.repo_files, rule.file)
     if moved.any():
         out.append(_finding(rule, "stale", f"{recorded.made} was made from files that are not as they were ({_listed(moved)}){again}"))
     if not recorded.ok:

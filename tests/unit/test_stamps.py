@@ -111,3 +111,11 @@ def test_agents_are_told_about_made_files_only_when_a_profile_checks_them(repo):
     assert "### Made files" in text and "`specs/S.stamp`" in text and "Never edit a stamp by hand" in text
     repo.write("gate.toml", GATE)
     assert "### Made files" not in rules.render(load(repo.root / "gate.toml"))
+
+
+def test_what_was_made_and_its_stamp_are_not_new_files_in_a_folder_the_stamp_covers(repo):
+    start(repo, covers=["specs", "src/**"])
+    repo.write("specs/S.out", "the result\n")
+    assert found(repo) == [], "the stamp and the result both sit in specs/, which it covers"
+    repo.write("specs/S.cfg", "new\n")
+    assert "specs/S.cfg is new" in found(repo)[0][2]

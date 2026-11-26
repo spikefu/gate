@@ -89,7 +89,12 @@ def read(path: Path) -> Stamp:
                  ok=data.get("ok", True) is not False, remake=str(data.get("remake", "")))
 
 
-def drift(root: Path, stamp: Stamp, repo_files: tuple[str, ...]) -> Drift:
+def drift(root: Path, stamp: Stamp, repo_files: tuple[str, ...], kept_at: str = "") -> Drift:
+    """How the repo differs from what the stamp recorded. `kept_at` is where the stamp itself is kept.
+
+    What was made, and its stamp, often sit in a folder the stamp covers. Neither is something it was made from,
+    so neither counts as a file that has appeared since.
+    """
     out = Drift()
     for rel, recorded in sorted(stamp.inputs.items()):
         path = root / rel
@@ -97,5 +102,7 @@ def drift(root: Path, stamp: Stamp, repo_files: tuple[str, ...]) -> Drift:
             out.gone.append(rel)
         elif digest(path) != recorded:
             out.changed.append(rel)
-    out.added = sorted(rel for rel in repo_files if rel not in stamp.inputs and any(matches(rel, glob) for glob in stamp.covers))
+    own = {stamp.made, kept_at}
+    out.added = sorted(rel for rel in repo_files
+                       if rel not in stamp.inputs and rel not in own and any(matches(rel, glob) for glob in stamp.covers))
     return out
