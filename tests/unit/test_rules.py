@@ -102,3 +102,8 @@ def test_prose_tells_agents_not_to_copy_code_with_the_configured_size(repo):
     block = rules.render(config(repo, "[duplication]\nmin_lines = 6\ninclude_tests = true\n"))
     assert "A block of 6 or more lines identical to code elsewhere in the repo fails." in block
     assert "### Duplication" not in rules.render(config(repo, '[profiles]\nfast = ["syntax"]\nfull = ["syntax"]\n'))
+
+
+def test_prose_tells_agents_to_delete_what_they_abandon_only_when_the_check_runs(repo):
+    assert "### Dead code" in rules.render(config(repo, ""))
+    assert "### Dead code" not in rules.render(config(repo, '[profiles]\nfast = ["syntax"]\nfull = ["syntax"]\n'))

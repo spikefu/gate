@@ -12,7 +12,7 @@ from pathlib import Path
 
 from .files import matches
 
-STRUCTURAL = ("syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication")
+STRUCTURAL = ("syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "dead-code")
 SUPPRESSION_KINDS = ("lint", "type", "test", "coverage")
 TOOLCHAIN = ("lint", "typecheck", "format", "security", "deps")
 # Designed but not built yet. Accepted in config so a file written against the
@@ -20,7 +20,7 @@ TOOLCHAIN = ("lint", "typecheck", "format", "security", "deps")
 PLANNED = ("test-quality", "coverage", "docs", "scope", "imports")
 
 _TOP_LEVEL = {"version", "files", "profiles", "syntax", "complexity", "size", "boundaries",
-              "suppressions", "test-integrity", "duplication", "toolchain", "tests", "command", "rules", *PLANNED}
+              "suppressions", "test-integrity", "duplication", "dead-code", "toolchain", "tests", "command", "rules", *PLANNED}
 
 
 class ConfigError(Exception):
@@ -77,6 +77,14 @@ class Duplication:
 
 
 @dataclass(frozen=True)
+class DeadCode:
+    severity: str = "fail"
+    # Names used in ways the repo's text does not show (built from strings, called by a framework).
+    ignore: tuple[str, ...] = ()
+    exclude: tuple[str, ...] = ()
+
+
+@dataclass(frozen=True)
 class OnlyRule:
     target: str
     allowed_from: tuple[str, ...]
@@ -112,6 +120,7 @@ class Config:
     suppressions: tuple[str, ...] = SUPPRESSION_KINDS
     test_integrity_severity: str = "fail"
     duplication: Duplication = Duplication()
+    dead_code: DeadCode = DeadCode()
     toolchain: dict[str, str] = field(default_factory=dict)
     tests: dict[str, Command] = field(default_factory=dict)
     commands: dict[str, Command] = field(default_factory=dict)
@@ -150,6 +159,7 @@ def load(path: Path | None) -> Config:
         suppressions=_suppressions(raw.get("suppressions", {})),
         test_integrity_severity=_severity(raw.get("test-integrity", {}), "test-integrity"),
         duplication=_duplication(raw.get("duplication", {})),
+        dead_code=_dead_code(raw.get("dead-code", {})),
         toolchain=_toolchain(raw.get("toolchain", {})),
         tests=tests,
         commands=commands,
@@ -231,6 +241,14 @@ def _duplication(table: dict) -> Duplication:
     cfg = _fields(Duplication, {**table, "exclude": tuple(table.get("exclude", ()))}, "duplication")
     if cfg.min_lines < 2:
         raise ConfigError("[duplication]: min_lines must be at least 2")
+    return cfg
+
+
+def _dead_code(table: dict) -> DeadCode:
+    cfg = _fields(DeadCode, {**table, "ignore": tuple(table.get("ignore", ())),
+                             "exclude": tuple(table.get("exclude", ()))}, "dead-code")
+    if cfg.severity not in ("fail", "warn"):
+        raise ConfigError('[dead-code]: severity must be "fail" or "warn"')
     return cfg
 
 

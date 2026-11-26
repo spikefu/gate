@@ -83,6 +83,7 @@ moves. The baseline matches on it.
 | `boundaries` | `a !-> b` forbidden imports, and "only X may import Y" rules for ports and adapters |
 | `suppressions` | Markers that switch a check off: lint and type ignores, skipped tests, coverage exclusions |
 | `duplication` | Blocks of code identical to code elsewhere in the repo, apart from layout and comments |
+| `dead-code` | Top-level definitions whose name appears nowhere else in the repo |
 | `test-integrity` | On a `--changed` run: the change leaves fewer tests, or fewer assertions, than the base ref had |
 | `lint`, `typecheck`, `format`, `security`, `deps` | The repo's own command, or the first installed tool for each language present |
 | `[tests.<name>]` | The repo's own test commands, judged by exit code |
@@ -120,6 +121,29 @@ A file being judged is compared with every code file in the repo, so new code
 copying old code is caught on a `--changed` run. Each file gets one finding
 carrying its number of copied lines, so the baseline is a ratchet. Test files
 are exempt by default, since tests repeat setup so each reads on its own.
+
+### Dead code
+
+An agent that changes approach halfway leaves the first attempt behind. The
+check flags a top-level definition (a Python function or class; an exported
+JS/TS function, class, constant, type, interface or enum) whose name appears
+exactly once in the whole repo: the definition itself. Any other mention, in
+code, a test, a config file or a document, counts as a use.
+
+That is crude on purpose. It misses dead code whose name is shared with
+something live, and in exchange almost never accuses code that is in use.
+Three guards cover what a text search cannot know:
+
+- only modules that other code imports are judged, so a file a framework
+  loads by convention (a route, a page, a migration) is left alone
+- a module re-exported wholesale (`export * from`, `from x import *`) is
+  skipped
+- a decorated Python definition is skipped, since the decorator may register it
+
+Default exports and files that nothing imports are not judged, so a wholly
+unused file is not found; that needs a tool that knows the framework's entry
+points. `[dead-code] ignore` lists names used in ways the text does not show,
+and `exclude` leaves out files such as a published package's public API.
 
 ### Test integrity
 
@@ -183,8 +207,8 @@ worst first, and is meant to be committed.
   first. Findings under one key are paired with its recorded values worst with
   worst, and any left over fail.
 
-- Only `complexity`, `size`, `boundaries`, `suppressions` and `duplication`
-  can be baselined. A failing test
+- Only `complexity`, `size`, `boundaries`, `suppressions`, `duplication` and
+  `dead-code` can be baselined. A failing test
   suite or linter is never grandfathered.
 - A baselined finding whose value gets worse fails again, and its message
   says what the baseline allows.

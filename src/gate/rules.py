@@ -42,6 +42,7 @@ def render(config: Config) -> str:
         *_boundaries(config),
         *_suppressions(config),
         *_duplication(config),
+        *_dead_code(config),
         "",
         "### Checks",
         "",
@@ -150,6 +151,19 @@ def _duplication(config: Config) -> list[str]:
         + ("" if d.include_tests else " (test files are exempt)") + ".",
         "- Before writing a helper, search for one that already does it. If two places need the same code, "
         "move it somewhere both can use.",
+    ]
+
+
+def _dead_code(config: Config) -> list[str]:
+    if not any("dead-code" in checks for checks in config.profiles.values()):
+        return []
+    return [
+        "",
+        "### Dead code",
+        "",
+        "- Do not leave code nothing uses. A function, class, constant or type whose name appears nowhere else "
+        "in the repo fails.",
+        "- When you change approach, delete what the first attempt left behind. Do not keep it \"in case\".",
     ]
 
 

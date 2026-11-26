@@ -27,10 +27,15 @@ Run `gate check --changed` before you finish. It must pass.
 - Do not copy code. A block of 10 or more lines identical to code elsewhere in the repo fails (test files are exempt).
 - Before writing a helper, search for one that already does it. If two places need the same code, move it somewhere both can use.
 
+### Dead code
+
+- Do not leave code nothing uses. A function, class, constant or type whose name appears nowhere else in the repo fails.
+- When you change approach, delete what the first attempt left behind. Do not keep it "in case".
+
 ### Checks
 
-- `gate check --profile fast` (default): syntax, complexity, size, boundaries, suppressions, test-integrity, duplication, lint.
-- `gate check --profile full`: syntax, complexity, size, boundaries, suppressions, test-integrity, duplication, lint, typecheck, unit, integration.
+- `gate check --profile fast` (default): syntax, complexity, size, boundaries, suppressions, test-integrity, duplication, dead-code, lint.
+- `gate check --profile full`: syntax, complexity, size, boundaries, suppressions, test-integrity, duplication, dead-code, lint, typecheck, unit, integration.
 - `lint` runs `ruff check .`.
 - `typecheck` runs `mypy`.
 - `unit` runs `pytest -q tests/unit`.

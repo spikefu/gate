@@ -11,7 +11,7 @@ exclude = ["**/node_modules/**", "**/dist/**", "**/build/**", "**/*.generated.*"
 # A profile is a named list of checks. Adapters pick one.
 
 [profiles]
-fast = ["syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "lint"]   # agent hook: seconds, changed files
+fast = ["syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "duplication", "dead-code", "lint"]   # agent hook: seconds, changed files
 full = ["syntax", "complexity", "size", "boundaries", "suppressions", "lint",
         "typecheck", "unit", "integration", "test-quality", "docs"]    # CI and pre-merge
 default = "fast"
@@ -54,6 +54,12 @@ min_lines = 10
 min_tokens = 100
 include_tests = false     # tests repeat their setup on purpose
 exclude = []              # globs left out, e.g. generated clients
+
+[dead-code]
+# A top-level definition whose name appears nowhere else in the repo.
+severity = "fail"         # the default; or "warn"
+ignore = []               # names used in ways the text does not show
+exclude = []              # globs left out, e.g. a published package's public API
 
 [test-integrity]
 # On a --changed run, a net loss of tests or assertions is a finding.
