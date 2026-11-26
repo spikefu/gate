@@ -27,7 +27,7 @@ def collect(ctx: Context) -> dict:
     """Everything `gate metrics` reports, for the files in play."""
     # Dependents of a changed file are mostly files that did not change, so the graph is the whole repo's.
     code = [rel for rel in ctx.repo_files if Path(rel).suffix in CODE_EXTS and not is_test(rel)]
-    imports, imported_by = _coupling(ctx, code)
+    imports, imported_by, deferred = _coupling(ctx, code)
     subjects = sorted(rel for rel in ctx.code_files() if not is_test(rel))
     packages = externals_for(ctx.root, ctx.repo_files, subjects)
     functions: dict[str, list] = {}
@@ -41,25 +41,36 @@ def collect(ctx: Context) -> dict:
     return {
         "files": files,
         "folders": _folders(code, imports, {PurePosixPath(rel).parent.as_posix() for rel in subjects}),
-        "edges": _edges(subjects, imports),
+        **_edges(subjects, imports, deferred),
     }
 
 
-def _edges(subjects: list[str], imports: dict[str, list[str]]) -> list[list[str]]:
-    """Each import from a reported file to another product file, as [importer, imported]: for tools that draw the structure."""
-    return [[rel, target] for rel in subjects for target in imports.get(rel, [])]
+def _edges(subjects: list[str], imports: dict[str, list[str]], deferred: set[tuple[str, str]]) -> dict[str, list[list[str]]]:
+    """Each import from a reported file to another product file, as [importer, imported]: for tools that draw the structure.
+
+    Listed apart are the ones that are only ever a type, or made after the file has loaded: they cannot make a loop when the code runs.
+    """
+    edges = [[rel, target] for rel in subjects for target in imports.get(rel, [])]
+    return {"edges": edges, "deferred_edges": [edge for edge in edges if (edge[0], edge[1]) in deferred]}
 
 
-def _coupling(ctx: Context, code: list[str]) -> tuple[dict[str, list[str]], dict[str, set[str]]]:
-    """For product code only: what each file imports, and what imports each file."""
+def _coupling(ctx: Context, code: list[str]) -> tuple[dict[str, list[str]], dict[str, set[str]], set[tuple[str, str]]]:
+    """For product code only: what each file imports, what imports each file, and which of those imports are all deferred."""
     known = set(code)
-    imports = {src: sorted({e.target for e in edges if e.target in known})
-               for src, edges in edges_for(ctx.root, ctx.repo_files, code).items()}
+    graph = edges_for(ctx.root, ctx.repo_files, code)
+    imports = {src: sorted({e.target for e in edges if e.target in known}) for src, edges in graph.items()}
+    deferred = _deferred(graph, imports)
     imported_by: dict[str, set[str]] = {}
     for src, targets in imports.items():
         for target in targets:
             imported_by.setdefault(target, set()).add(src)
-    return imports, imported_by
+    return imports, imported_by, deferred
+
+
+def _deferred(graph: dict, imports: dict[str, list[str]]) -> set[tuple[str, str]]:
+    """The imports between two files that are never made while the importing file loads."""
+    eager = {(src, edge.target) for src, edges in graph.items() for edge in edges if not edge.lazy}
+    return {(src, target) for src, targets in imports.items() for target in targets} - eager
 
 
 def _file(ctx: Context, rel: str, functions: list, packages: list[str], coupling: tuple[int, int]) -> dict:

@@ -95,3 +95,12 @@ def test_a_python_package_has_its_init_as_entry_and_non_file_import_targets_are_
     files, folders = collect(repo)
     assert folders["pkg"]["has_entry"] is True
     assert files["apps/web/a.ts"]["imports"] == 0, "a bare package folder and a test file are not product files"
+
+
+def test_an_import_that_is_only_a_type_or_made_later_is_listed_as_deferred(repo):
+    repo.write("src/a.ts", 'import type { B } from "./b"\nimport { c } from "./c"\nimport type { C } from "./c"\nexport const a = c\n')
+    repo.write("src/b.ts", 'export type B = number\nexport const load = () => import("./c")\n')
+    repo.write("src/c.ts", "export const c = 1\nexport type C = number\n")
+    report = metrics.collect(repo.context())
+    assert report["edges"] == [["src/a.ts", "src/b.ts"], ["src/a.ts", "src/c.ts"], ["src/b.ts", "src/c.ts"]]
+    assert report["deferred_edges"] == [["src/a.ts", "src/b.ts"], ["src/b.ts", "src/c.ts"]], "a imports c for real as well as for a type"
