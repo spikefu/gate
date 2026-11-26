@@ -22,7 +22,7 @@ def test_missing_config_gives_the_documented_defaults(tmp_path):
     assert (config.complexity.ccn_warn, config.complexity.ccn_fail) == (10, 15)
     assert (config.complexity.max_function_lines, config.complexity.max_parameters) == (80, 5)
     assert (config.size.warn, config.size.fail, config.size.test_fail) == (300, 500, 1000)
-    assert config.checks_for(None) == ("fast", ["syntax", "complexity", "size", "boundaries", "suppressions", "lint"])
+    assert config.checks_for(None) == ("fast", ["syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity", "lint"])
 
 
 @pytest.mark.parametrize("text, fragment", [
@@ -35,6 +35,7 @@ def test_missing_config_gives_the_documented_defaults(tmp_path):
     ('[[complexity.override]]\nglob = "a"\nmax_lines = 5\n', "complexity.override"),
     ('[[complexity.override]]\nmax_function_lines = 5\n', "complexity.override"),
     ('[suppressions]\nkinds = ["lints"]\n', "lints"),
+    ('[test-integrity]\nseverity = "off"\n', "test-integrity"),
 ])
 def test_typos_are_errors_not_silently_ignored(tmp_path, text, fragment):
     with pytest.raises(ConfigError, match=fragment):

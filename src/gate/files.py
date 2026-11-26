@@ -54,6 +54,21 @@ def changed_files(root: Path, base: str, exclude: tuple[str, ...] = ()) -> list[
     return _keep(root, [*diff, *untracked], exclude)
 
 
+def deleted_files(root: Path, base: str, exclude: tuple[str, ...] = ()) -> list[str]:
+    """Files that exist at `base` and are gone from the working tree."""
+    gone = _git(root, "diff", "--name-only", "--diff-filter=D", "--no-renames", "-z", base) or []
+    return sorted(rel for rel in gone if not any(matches(rel, pat) for pat in exclude))
+
+
+def at_ref(root: Path, ref: str, rel: str) -> str | None:
+    """A file's text as it was at `ref`, or None if it did not exist there."""
+    try:
+        proc = subprocess.run(["git", "-C", str(root), "show", f"{ref}:./{rel}"], capture_output=True)
+    except OSError:
+        return None
+    return proc.stdout.decode("utf-8", errors="replace") if proc.returncode == 0 else None
+
+
 def explicit_files(root: Path, paths: list[str], exclude: tuple[str, ...] = ()) -> list[str]:
     """Explicit paths may be files or directories, relative to the caller's cwd."""
     out: list[str] = []

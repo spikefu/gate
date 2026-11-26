@@ -7,7 +7,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from . import baseline, files
-from .checks import boundaries, command, complexity, size, suppressions, syntax, toolchain
+from .checks import boundaries, command, complexity, size, suppressions, syntax, test_integrity, toolchain
 from .config import PLANNED, TOOLCHAIN, Config
 from .context import Context
 from .findings import Finding, Report, Skipped
@@ -18,14 +18,15 @@ _STRUCTURAL: dict[str, Callable[[Context], list[Finding]]] = {
     "size": size.run,
     "boundaries": boundaries.run,
     "suppressions": suppressions.run,
+    "test-integrity": test_integrity.run,
 }
 
 
-def build_context(root: Path, config: Config, selected: list[str] | None) -> Context:
-    """`selected` None means the whole repo."""
+def build_context(root: Path, config: Config, selected: list[str] | None, base: str | None = None) -> Context:
+    """`selected` None means the whole repo. `base` is set when the selection is a diff against that ref."""
     repo = tuple(files.all_files(root, config.exclude))
     chosen = repo if selected is None else tuple(selected)
-    return Context(root=root, config=config, files=chosen, repo_files=repo, scoped=selected is not None)
+    return Context(root=root, config=config, files=chosen, repo_files=repo, scoped=selected is not None, base=base)
 
 
 def run(ctx: Context, profile: str | None, mode: str, strict: bool = False) -> Report:

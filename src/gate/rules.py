@@ -50,7 +50,8 @@ def render(config: Config) -> str:
         "",
         "- Violations that predate these rules are recorded in `.gate/baseline.json`. Do not make them worse.",
         "- Never run `gate baseline --accept`, edit the baseline by hand, or change a limit to make a finding go away.",
-        "- Never delete, skip, or loosen a test to get a check to pass.",
+        "- Never delete, skip, or loosen a test to get a check to pass. A change that leaves fewer tests or "
+        "assertions than it started with fails; if one should go, say why in your report.",
         "",
         *_IMPROVING,
         END,

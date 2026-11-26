@@ -249,3 +249,20 @@ def test_adding_a_suppression_fails_until_a_person_accepts_it(repo):
     repo.write("a.ts", "export const a: number = f()\n")
     assert check_json(repo, "--changed")[0] == 0
     assert gate(repo, "baseline", "--check")[0] == 1, "the fix has to be recorded so it cannot be undone"
+
+
+def test_a_change_that_deletes_a_test_fails_until_it_is_committed(repo):
+    repo.write("gate.toml", '[profiles]\nfast = ["test-integrity"]\n')
+    repo.write("a.test.ts", "it('adds', () => { expect(add(1, 1)).toBe(2) })\nit('subtracts', () => { expect(sub(1, 1)).toBe(0) })\n")
+    repo.commit()
+    assert check_json(repo, "--changed")[0] == 0
+
+    repo.write("a.test.ts", "it('adds', () => { expect(add(1, 1)).toBe(2) })\n")
+    code, report = check_json(repo, "--changed")
+    (finding,) = report["findings"]
+    assert code == 1 and finding["check"] == "test-integrity" and "removes 1 test(s)" in finding["message"]
+    assert check_json(repo)[0] == 0, "a whole-repo run has no before to compare with"
+
+    repo.commit()  # committing is the person's acceptance
+    assert check_json(repo, "--changed")[0] == 0
+    assert check_json(repo, "--changed", "--base", "HEAD~1")[0] == 1, "against the older ref the loss is still visible"

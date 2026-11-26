@@ -73,12 +73,12 @@ def _parser() -> argparse.ArgumentParser:
 def _check(args, root: Path, config) -> int:
     exclude = config.exclude
     if args.changed:
-        selected, mode = files.changed_files(root, args.base, exclude), "changed"
+        selected, mode, base = files.changed_files(root, args.base, exclude), "changed", args.base
     elif args.paths:
-        selected, mode = files.explicit_files(root, args.paths, exclude), "paths"
+        selected, mode, base = files.explicit_files(root, args.paths, exclude), "paths", None
     else:
-        selected, mode = None, "all"
-    ctx = runner.build_context(root, config, selected)
+        selected, mode, base = None, "all", None
+    ctx = runner.build_context(root, config, selected, base)
     report = runner.run(ctx, args.profile, mode, strict=args.strict)
     print(report.to_json() if args.json else report.to_text())
     return OK if report.ok else FAILED

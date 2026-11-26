@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from gate import runner
+from gate import files, runner
 from gate.config import load
 
 
@@ -30,8 +30,12 @@ class Repo:
         self.git("add", "-A")
         self.git("commit", "-qm", "snapshot")
 
-    def context(self, selected: list[str] | None = None):
-        return runner.build_context(self.root, load(self.root / "gate.toml"), selected)
+    def context(self, selected: list[str] | None = None, base: str | None = None):
+        return runner.build_context(self.root, load(self.root / "gate.toml"), selected, base)
+
+    def changed(self):
+        """The context `gate check --changed` would build."""
+        return self.context(files.changed_files(self.root, "HEAD"), "HEAD")
 
 
 @pytest.fixture

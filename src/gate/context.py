@@ -23,6 +23,7 @@ class Context:
     files: tuple[str, ...]       # the files this run judges
     repo_files: tuple[str, ...]  # every file in the repo, for cross-file analysis
     scoped: bool                 # True when `files` is a subset (changed or explicit paths)
+    base: str | None = None      # the git ref a `--changed` run compares against
 
     def code_files(self) -> list[str]:
         return [f for f in self.files if Path(f).suffix in CODE_EXTS]

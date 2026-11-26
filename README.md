@@ -93,6 +93,7 @@ agent change `gate.toml`, a limit, or the baseline by itself.
 | `complexity` | cyclomatic complexity, function length, parameter count, with per-glob overrides |
 | `size` | file line count, a longer limit for test files, and per-glob overrides |
 | `suppressions` | any added marker that switches a check off: lint and type ignores, skipped tests, coverage exclusions |
+| `test-integrity` | on `--changed`: the change leaves the repo with fewer tests or fewer assertions |
 | `boundaries` | `a !-> b` rules and "only X may import Y" rules, through relative imports, tsconfig aliases and workspace packages |
 | `lint`, `typecheck`, `format`, `security`, `deps` | your command, or the first installed tool for the language |
 | `[tests.<name>]`, `[[command]]` | exit code of your own command |

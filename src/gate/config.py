@@ -12,7 +12,7 @@ from pathlib import Path
 
 from .files import matches
 
-STRUCTURAL = ("syntax", "complexity", "size", "boundaries", "suppressions")
+STRUCTURAL = ("syntax", "complexity", "size", "boundaries", "suppressions", "test-integrity")
 SUPPRESSION_KINDS = ("lint", "type", "test", "coverage")
 TOOLCHAIN = ("lint", "typecheck", "format", "security", "deps")
 # Designed but not built yet. Accepted in config so a file written against the
@@ -20,7 +20,7 @@ TOOLCHAIN = ("lint", "typecheck", "format", "security", "deps")
 PLANNED = ("test-quality", "coverage", "docs", "scope", "imports")
 
 _TOP_LEVEL = {"version", "files", "profiles", "syntax", "complexity", "size", "boundaries",
-              "suppressions", "toolchain", "tests", "command", "rules", *PLANNED}
+              "suppressions", "test-integrity", "toolchain", "tests", "command", "rules", *PLANNED}
 
 
 class ConfigError(Exception):
@@ -100,6 +100,7 @@ class Config:
     boundaries: Boundaries = Boundaries()
     # Which kinds of suppression marker count as findings.
     suppressions: tuple[str, ...] = SUPPRESSION_KINDS
+    test_integrity_severity: str = "fail"
     toolchain: dict[str, str] = field(default_factory=dict)
     tests: dict[str, Command] = field(default_factory=dict)
     commands: dict[str, Command] = field(default_factory=dict)
@@ -136,6 +137,7 @@ def load(path: Path | None) -> Config:
         size=_size(raw.get("size", {})),
         boundaries=_boundaries(raw.get("boundaries", {})),
         suppressions=_suppressions(raw.get("suppressions", {})),
+        test_integrity_severity=_severity(raw.get("test-integrity", {}), "test-integrity"),
         toolchain=_toolchain(raw.get("toolchain", {})),
         tests=tests,
         commands=commands,
@@ -211,6 +213,13 @@ def _suppressions(table: dict) -> tuple[str, ...]:
         raise ConfigError(f"[suppressions]: unknown key or kind {', '.join(sorted(unknown))}; "
                           f"kinds are {', '.join(SUPPRESSION_KINDS)}")
     return tuple(kinds)
+
+
+def _severity(table: dict, section: str) -> str:
+    severity = table.get("severity", "fail")
+    if set(table) - {"severity"} or severity not in ("fail", "warn"):
+        raise ConfigError(f'[{section}]: the only key is severity, "fail" or "warn"')
+    return severity
 
 
 def _toolchain(table: dict) -> dict[str, str]:

@@ -82,6 +82,7 @@ moves. The baseline matches on it.
 | `size` | File line count, a longer limit for test files, and per-glob overrides |
 | `boundaries` | `a !-> b` forbidden imports, and "only X may import Y" rules for ports and adapters |
 | `suppressions` | Markers that switch a check off: lint and type ignores, skipped tests, coverage exclusions |
+| `test-integrity` | On a `--changed` run: the change leaves fewer tests, or fewer assertions, than the base ref had |
 | `lint`, `typecheck`, `format`, `security`, `deps` | The repo's own command, or the first installed tool for each language present |
 | `[tests.<name>]` | The repo's own test commands, judged by exit code |
 | `[[command]]` | Any other script with an exit code: end-to-end tests, accessibility scans, migration drift |
@@ -100,6 +101,26 @@ Markers are counted only where they act. Python is tokenized, so a marker
 quoted in a string or docstring is not counted. Other languages are matched
 by line against the comment or call syntax. `[suppressions] kinds` narrows
 which of `lint`, `type`, `test` and `coverage` count.
+
+### Test integrity
+
+When a test will not pass, the cheapest fix is to delete it or remove the
+assertion that fails. The suite stays green and nothing else notices. On a
+`--changed` run this check counts tests and assertions in every test file the
+change touches, adds or deletes, at the base ref and now, and fails on a net
+loss of either.
+
+Counting across all touched files together means moving tests, renaming a
+file or splitting one is free. Only test files count, so a runtime `assert`
+removed from source is not a finding. The counts are by line against each
+language's syntax and so approximate, but the same on both sides.
+
+It cannot tell a test deleted to hide a failure from one deleted along with
+the feature it covered. It says what was lost and stops there: the agent is
+told to restore it or explain, and committing the change is the person's
+acceptance, since after that the default base no longer shows a loss. A repo
+that compares against a branch in CI can set `[test-integrity] severity =
+"warn"`. A whole-repo run has no "before", so the check reports nothing.
 
 ### Default limits
 
@@ -218,7 +239,8 @@ adapters/
 
 ## Not built yet
 
-- Checks: test quality (tests with no real assertion), coverage, scope (diff
+- Checks: test quality (tests with no real assertion), coverage of the lines
+  a change touches, scope (diff
   stays inside declared files), required READMEs, imports of symbols a module
   does not export.
 - Adapters: pre-commit, and other agent harnesses.
