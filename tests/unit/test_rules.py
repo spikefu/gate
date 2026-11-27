@@ -81,6 +81,24 @@ def test_configured_targets_win_and_writing_twice_changes_nothing(repo):
     assert (repo.root / "docs/AI.md").read_text() == first
 
 
+def test_the_heading_has_a_blank_line_above_it_as_markdown_formatters_want(repo):
+    assert rules.render(config(repo)).startswith(rules.START + "\n\n## Rules this repo is held to\n")
+
+
+def test_a_section_written_before_the_blank_line_is_not_stale_and_is_left_alone(repo):
+    cfg = config(repo)
+    old = rules.render(cfg).replace(rules.START + "\n\n", rules.START + "\n", 1)
+    repo.write("AGENTS.md", "# Mine\n\n" + old)
+    assert rules.stale(repo.root, cfg) == []
+    assert rules.write(repo.root, cfg) == []
+    assert (repo.root / "AGENTS.md").read_text() == "# Mine\n\n" + old
+    repo.write("gate.toml", "[complexity]\nccn_fail = 8\n")
+    changed = load(repo.root / "gate.toml")
+    assert rules.stale(repo.root, changed) == [repo.root / "AGENTS.md"], "old layout with other rules is still stale"
+    rules.write(repo.root, changed)
+    assert rules.START + "\n\n## Rules" in (repo.root / "AGENTS.md").read_text(), "and is rewritten in the new layout"
+
+
 def test_stale_when_the_config_changes_after_the_prose_was_written(repo):
     rules.write(repo.root, config(repo))
     assert rules.stale(repo.root, config(repo)) == []
