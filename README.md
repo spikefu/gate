@@ -99,6 +99,7 @@ agent change `gate.toml`, a limit, or the baseline by itself.
 | `new-dependencies` | a package in a manifest that nobody has approved with `gate dependencies --accept` |
 | `change-size` | nothing by default: on `--changed` it warns when a change adds over 400 lines of non-test code |
 | `coverage` | on `--changed`: the tests run under 80% of the lines the change adds. Opt-in: needs `[coverage] report` |
+| `seeded-bugs` | on `--changed`: a small fault planted in a line the change adds, which the tests still pass with. Warns by default. Opt-in: needs `[seeded-bugs] command` |
 | `stamps` | a file the repo keeps (an index, a checked specification) was made from files that have since changed. Opt-in: needs `[[stamp]]` entries |
 | `mutable-state` | an added module-level variable that code reassigns (top-level `let`/`var`, Python `global`) |
 | `test-integrity` | on `--changed`: the change leaves the repo with fewer tests or fewer assertions |
@@ -109,6 +110,40 @@ agent change `gate.toml`, a limit, or the baseline by itself.
 Only `complexity`, `size` and `boundaries` can be baselined. A baselined
 finding that gets worse fails again, and each recorded value covers one
 finding, so a new function cannot hide behind an old one with the same name.
+
+### Seeded bugs
+
+Coverage says the tests ran a line. It does not say they would notice if the
+line were wrong. `seeded-bugs` asks that directly: for the lines a change adds,
+it plants one small fault at a time and runs the tests. A fault they still
+pass with is a line whose behaviour nothing pins down.
+
+```toml
+[seeded-bugs]
+command = "npm test --silent"   # quick tests: this runs once for every fault
+max_faults = 30                 # the most one run plants
+max_seconds = 600               # and the longest it may take in all
+severity = "warn"               # or "fail"
+
+[profiles]
+change = ["seeded-bugs"]        # then: gate check --changed --profile change
+```
+
+The faults are the slips a careless edit makes: a comparison nudged across
+its boundary, `and` for `or`, a truth value flipped, a negation dropped, plus
+for minus, a condition that no longer decides. They land only on code, in
+Python, JavaScript and TypeScript.
+
+It never touches the working tree. The repo's files are copied to a temporary
+folder, with `node_modules` and `.venv` linked in, and everything happens
+there. Before any fault is believed, the tests must pass in the clean copy,
+and each file must make them fail when broken outright. A file that can be
+broken without a test failing is reported once, as nothing depending on it,
+and its faults are not tried.
+
+It warns unless told to fail, because a fault going unnoticed is not always a
+missing test: sometimes the code behaves the same either way, and that takes a
+person to tell.
 
 ## Adapters
 

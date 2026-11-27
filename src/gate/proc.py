@@ -14,9 +14,9 @@ from pathlib import Path
 POSIX = os.name == "posix"
 
 
-def run(command: str | list[str], cwd: Path, timeout: int) -> tuple[int | None, str]:
+def run(command: str | list[str], cwd: Path, timeout: int, extra_env: dict[str, str] | None = None) -> tuple[int | None, str]:
     """Return (exit code, combined output). Exit code None means it timed out."""
-    env = {**os.environ, "NO_COLOR": "1", "PATH": tool_path(cwd)}
+    env = {**os.environ, "NO_COLOR": "1", "PATH": tool_path(cwd), **(extra_env or {})}
     proc = subprocess.Popen(
         command, shell=isinstance(command, str), cwd=cwd, env=env, text=True,
         stdout=subprocess.PIPE, stderr=subprocess.STDOUT, start_new_session=POSIX,

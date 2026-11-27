@@ -12,7 +12,8 @@ from .config import Config
 
 def sections(config: Config) -> list[str]:
     """Every check's paragraph, in the order an agent should read them."""
-    writers = (_suppressions, _duplication, _dead_code, _dependencies, _change_size, _coverage, _mutable_state, _stamps)
+    writers = (_suppressions, _duplication, _dead_code, _dependencies, _change_size, _coverage, _seeded_bugs,
+               _mutable_state, _stamps)
     return [line for writer in writers for line in writer(config)]
 
 
@@ -122,6 +123,23 @@ def _coverage(config: Config) -> list[str]:
         "a change adds.",
         "- Write tests that exercise the new lines. Do not add coverage exclusions, and do not delete code paths "
         "to raise the figure.",
+    ]
+
+
+def _seeded_bugs(config: Config) -> list[str]:
+    if not config.seeded_bugs.command or not any("seeded-bugs" in checks for checks in config.profiles.values()):
+        return []
+    outcome = "fails the gate" if config.seeded_bugs.severity == "fail" else "is reported"
+    return [
+        "",
+        "### Seeded bugs",
+        "",
+        "- Tests must notice when the code is wrong, not only run it. For the lines a change adds, gate plants one "
+        f"small fault at a time and runs the tests; a fault they still pass with {outcome}.",
+        "- When one goes unnoticed, add a test that would fail with that fault. Assert on what the code returns "
+        "or does, at the values where it changes its mind.",
+        "- If the fault cannot change what the code does, say so in your report and leave the finding. Do not "
+        "rewrite the code only to make the fault impossible to plant.",
     ]
 
 
