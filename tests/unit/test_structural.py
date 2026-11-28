@@ -56,6 +56,16 @@ def test_function_length_and_parameter_limits(repo):
     assert (found["parameters"].symbol, found["parameters"].value) == ("wide", 6)
 
 
+def test_a_quote_in_a_pages_text_does_not_hide_the_functions_after_it(repo):
+    # Text between tags is not code. Read as the start of a string, the first apostrophe would run on to the
+    # second and take every function between them with it: `short` would be measured to the end of the file.
+    long_body = "".join(f"  const v{i} = {i};\n" for i in range(125))
+    repo.write("page.tsx", "function short() {\n  return <p>the owner's note</p>;\n}\n\n"
+               f"function long() {{\n{long_body}  return <p>somebody's</p>;\n}}\n")
+    found = complexity.run(repo.context())
+    assert [(f.rule, f.symbol, f.line) for f in found] == [("function-lines", "long", 5)]
+
+
 def test_complexity_limits_come_from_config(repo):
     repo.write("gate.toml", "[complexity]\nccn_fail = 3\nccn_warn = 2\n")
     repo.write("a.py", branchy("f", 4))

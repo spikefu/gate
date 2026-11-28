@@ -14,11 +14,15 @@ import lizard
 
 from ..context import Context
 from ..findings import FAIL, WARN, Finding
+from ..lang import jsx_text
 
 EXTS = {
     ".py", ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".go", ".rs", ".java", ".kt",
     ".swift", ".c", ".h", ".cc", ".cpp", ".hpp", ".cs", ".rb", ".php", ".scala", ".lua",
 }
+
+
+_MAY_HOLD_JSX = {".tsx", ".jsx", ".js", ".mjs", ".cjs"}
 
 
 def run(ctx: Context) -> list[Finding]:
@@ -31,11 +35,20 @@ def functions(ctx: Context) -> Iterator[tuple[str, Any]]:
         if Path(rel).suffix not in EXTS:
             continue
         try:
-            analysis = lizard.analyze_file(str(ctx.root / rel))
+            analysis = _measured(ctx.root / rel)
         except Exception:  # lizard cannot parse everything; syntax is another check's job
             continue
         for fn in analysis.function_list:
             yield rel, fn
+
+
+def _measured(path: Path) -> Any:
+    """lizard's reading of one file. A file that can hold JSX is handed over without the quotes in its element
+    text, which lizard would take for the start of a string and lose every function up to the next one."""
+    if path.suffix not in _MAY_HOLD_JSX:
+        return lizard.analyze_file(str(path))
+    code = jsx_text.without_quotes(path.read_bytes(), str(path)).decode("utf-8", "replace")
+    return lizard.analyze_file.analyze_source_code(str(path), code)
 
 
 def _judge(ctx: Context, rel: str, fn) -> list[Finding]:
